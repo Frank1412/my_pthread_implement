@@ -73,16 +73,14 @@ typedef struct mutex_waiting_queue_node {
     struct mutex_waiting_queue_node *next;
 } mutex_waiting_queue_node;
 
-typedef struct my_pthread_mutex_t
-{
+typedef struct my_pthread_mutex_t {
     int initialized;
     my_pthread_t pid;
     int mutex_lock;
     uint mid;
 };
 
-typedef struct join_waiting_queue_node
-{
+typedef struct join_waiting_queue_node {
     my_pthread *thread;
     mypthread_t tid;
     void **value_pointer;
@@ -98,7 +96,7 @@ typedef struct Scheduler {
     //	The third run queue is FIFO
     Queue *SJF_queue;
     // The fourth running queue is MLFQ
-    Queue *MLFQ_queue;
+    Queue *round_robin_queue_T3;
     //	Stores which queue is currently running
     int current_queue_number;
     //	The first wait queue is for threads waiting for a mutex lock
@@ -109,11 +107,11 @@ typedef struct Scheduler {
     //  The list contains pid of all finished thread
     Queue *exit_thread_list;
     // current thread in execution state
-    Node *thread_node; //  c d e f g a+1 b+0.5 c+0.1
-} tcb;
+    Node *current_thread; //  c d e f g a+1 b+0.5 c+0.1
+} Scheduler;
 
 // global variables
-tcb *scheduler;
+Scheduler *scheduler;
 struct itimerval timer;
 int scheduler_running;
 int modifying_queue; // binary semaphore
@@ -149,7 +147,9 @@ int mypthread_mutex_unlock(mypthread_mutex_t *mutex);
 int mypthread_mutex_destroy(mypthread_mutex_t *mutex);
 
 tcb *InitialScheduler();
+
 Node *InitialThreadContainer();
+
 int AddNodeIntoRunningQueue(int schedulerStyle, Node *threadNode);
 
 #ifdef USE_MYTHREAD

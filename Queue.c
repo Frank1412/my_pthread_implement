@@ -4,14 +4,16 @@
 
 #include "Queue.h"
 
-void init(Queue **queue){
-    *queue = (Queue *)malloc(sizeof(Queue));
-    (*queue)->head = (Node *) malloc(sizeof(Node));
-    (*queue)->rear = (Node *) malloc(sizeof(Node));
-    (*queue)->head->next = (*queue)->rear;
-    (*queue)->head->prev = NULL;
-    (*queue)->rear->prev = (*queue)->head;
-    (*queue)->rear->next = NULL;
+Queue *initQueue(){
+    Queue *queue = (Queue *)malloc(sizeof(Queue));
+    queue->head = (Node*) malloc(sizeof(Node));
+    queue->rear = (Node*) malloc(sizeof(Node));
+    queue->head->next = queue->rear;
+    queue->head->prev = NULL;
+    queue->rear->prev = queue->head;
+    queue->rear->next = NULL;
+    queue->size = 0;
+    return queue;
 }
 
 int isEmpty(Queue *queue){

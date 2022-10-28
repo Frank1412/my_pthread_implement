@@ -21,7 +21,7 @@ typedef struct Queue {
     int size;
 } Queue;
 
-void init(Queue **queue);
+Queue *initQueue();
 
 int isEmpty(Queue *queue);
 
