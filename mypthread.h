@@ -93,8 +93,6 @@ typedef struct Scheduler {
     Queue *round_robin_queue_T1;
     //	The second run queue is round robin with a time quantum of 50 ms
     Queue *round_robin_queue_T2;
-    //	The third run queue is FIFO
-    Queue *SJF_queue;
     // The fourth running queue is MLFQ
     Queue *round_robin_queue_T3;
     //	Stores which queue is currently running
@@ -146,11 +144,11 @@ int mypthread_mutex_unlock(mypthread_mutex_t *mutex);
 /* destroy a mutex */
 int mypthread_mutex_destroy(mypthread_mutex_t *mutex);
 
-tcb *InitialScheduler();
+Scheduler *initial_scheduler();
 
-Node *InitialThreadContainer();
+Node *create_thread_node();
 
-int AddNodeIntoRunningQueue(int schedulerStyle, Node *threadNode);
+int add_node_into_queue(int schedulerStyle, Node *threadNode);
 
 #ifdef USE_MYTHREAD
 #define pthread_t mypthread_t

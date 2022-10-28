@@ -14,12 +14,12 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
     // YOUR CODE HERE
 //	int tid = pthread_create(thread, attr, function, arg);
 
-    if (sch == NULL) {
+    if (scheduler == NULL) {
         thread_number = 0;
         // create a Thread Control Block
-        scheduler = InitialScheduler();
+        scheduler = initial_scheduler();
         // create and initialize the context of this thread
-        Node *newNode = InitialThreadContainer();
+        Node *newNode = create_thread_node();
         while (__sync_lock_test_and_set(&modifying_queue, 1) == 1);
         AddNodeIntoRunningQueue(1, newNode);// TODO: about schedulerStyle, should be changed when changing test data
         __sync_lock_release(&modifying_queue);
@@ -166,29 +166,12 @@ static void sched_MLFQ() {
 
 // YOUR CODE HERE
 
-Scheduler *InitialScheduler() {
+Scheduler *initial_scheduler() {
     while (__sync_lock_test_and_set(&modifying_queue, 1) == 1);
     scheduler = malloc(sizeof(Scheduler));
-//    init(&scheduler->round_robin_queue_T1);
     scheduler->round_robin_queue_T1 = initQueue();
     scheduler->round_robin_queue_T2 = initQueue();
     scheduler->round_robin_queue_T3 = initQueue();
-//    scheduler->round_robin_queue_T1 = malloc(sizeof(Queue));
-//    scheduler->round_robin_queue_T1->head = NULL;
-//    scheduler->round_robin_queue_T1->rear = NULL;
-//    scheduler->round_robin_queue_T1->size = 0;
-//    scheduler->round_robin_queue_T2 = malloc(sizeof(Queue));
-//    scheduler->round_robin_queue_T2->head = NULL;
-//    scheduler->round_robin_queue_T2->rear = NULL;
-//    scheduler->round_robin_queue_T2->size = 0;
-//    scheduler->SJF_queue = malloc(sizeof(Queue));
-//    scheduler->SJF_queue->head = NULL;
-//    scheduler->SJF_queue->rear = NULL;
-//    scheduler->SJF_queue->size = 0;
-    // ??
-    // TODO: What should this part like?
-//    scheduler->round_robin_queue_T3 = NULL;
-    // ??
 
     scheduler->current_queue_number = 1;
     scheduler->mutex_waiting_queue = NULL;
@@ -198,12 +181,12 @@ Scheduler *InitialScheduler() {
     return scheduler;
 }
 
-Node *InitialThreadContainer() {
+Node *create_thread_node() {
     // create new Node
     Node *threadNode = malloc(sizeof(thread_container));
     threadNode->next = NULL;
     threadNode->prev = NULL;
-    // create new thread container
+    // create new thread node
     thread_control_block *newThread = malloc(sizeof(thread_control_block));
     // create and initialize the context of this thread
     newThread->context = malloc(sizeof(ucontext_t));
@@ -219,48 +202,16 @@ Node *InitialThreadContainer() {
     return threadNode;
 }
 
-int AddNodeIntoRunningQueue(int schedulerStyle, Node *threadNode) {
-    Node *ptrNode;
-    Queue *ptrQueue;
-    if (schedulerStyle == 0) {// round-robin with 25ms
-        if (scheduler->round_robin_queue_T1->head == NULL) {
-            scheduler->round_robin_queue_T1->rear = threadNode;
-            scheduler->round_robin_queue_T1->head = threadNode;
-            scheduler->round_robin_queue_T1->size++;
-            __sync_lock_release(&modifying_queue);
-            return 0;
-        }
-        ptrNode = scheduler->round_robin_queue_T1->head;
-        ptrQueue = scheduler->round_robin_queue_T1;
-    } else if (schedulerStyle == 1) {// round-robin with 50ms
-        if (scheduler->round_robin_queue_T2->head == NULL) {
-            scheduler->round_robin_queue_T2->rear = threadNode;
-            scheduler->round_robin_queue_T2->head = threadNode;
-            scheduler->round_robin_queue_T2->size++;
-            __sync_lock_release(&modifying_queue);
-            return 0;
-        }
-        ptrNode = scheduler->round_robin_queue_T2->head;
-        ptrQueue = scheduler->round_robin_queue_T2;
-    } else if (schedulerStyle == 2) {// SJF
-        if (scheduler->SJF_queue->head == NULL) {
-            scheduler->SJF_queue->rear = threadNode;
-            scheduler->SJF_queue->head = threadNode;
-            scheduler->SJF_queue->size++;
-            __sync_lock_release(&modifying_queue);
-            return 0;
-        }
-        ptrNode = scheduler->SJF_queue->head;
-        ptrQueue = scheduler->SJF_queue;
+int add_node_into_queue(int running_queue_number, Node *threadNode) {
+
+    if (running_queue_number == 0) {// round-robin with 25ms
+        addFront(scheduler->round_robin_queue_T1, threadNode);
+    } else if (running_queue_number == 1) {// round-robin with 50ms
+        addFront(scheduler->round_robin_queue_T2, threadNode);
+    } else if (running_queue_number == 2) {// SJF
+        addFront(scheduler->round_robin_queue_T3, threadNode);
     } else {// MLFQ
         // TODO: structure of MLFQ is unknown.
     }
-    while (ptrNode->next != NULL) {
-        ptrNode = ptrNode->next;
-    }
-    ptrNode->next = threadNode;
-    threadNode->prev = ptrNode;
-    ptrQueue->rear = ptrNode;
-    ptrQueue->size++;
     return 0;
 }
