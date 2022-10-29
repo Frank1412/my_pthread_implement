@@ -134,3 +134,29 @@ int add_to_mutex_waiting_queue(mutex_waiting_queue_node* node){
     ptr->next=node;
     return 0;
 }
+
+static void sched_RR() {
+    // TODO
+    // YOUR CODE HERE
+    Node *ptr=scheduler->round_robin_queue_T1->head->next;
+    Queue *current_running_queue=scheduler->round_robin_queue_T1;
+    scheduler->round_robin_queue_T1->head->next=ptr->next;
+    ptr->next=NULL;
+    ptr->prev=NULL;
+    age();
+    thread_handle(ptr);
+    // Your own implementation of RR
+    // (feel free to modify arguments and return types)
+
+    return;
+}
+static void sched_PSJF() {
+    // TODO
+    // YOUR CODE HERE
+
+
+    // Your own implementation of PSJF (STCF)
+    // (feel free to modify arguments and return types)
+
+    return;
+}
