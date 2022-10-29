@@ -37,8 +37,8 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
         mutex_id = 0;
     }
     // set a timer to 25ms
-    if(timer.it_interval.tv_usec==0){
-        signal(SIGVTALRM, (void (*)(int))& swap_context);
+    if (timer.it_interval.tv_usec == 0) {
+        signal(SIGVTALRM, (void (*)(int)) &swap_context);
         getitimer(ITIMER_VIRTUAL, &timer);
         timer.it_value.tv_sec = 0;
         timer.it_value.tv_usec = TIMER_PARA;
@@ -47,28 +47,28 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
         setitimer(ITIMER_VIRTUAL, &timer, NULL);
     }
     // initialize a new thread
-    Node *new_thread= malloc(sizeof(Node));
-    new_thread->tcb= malloc(sizeof(thread_control_block));
-    new_thread->tcb->context= malloc(sizeof(ucontext_t));
+    Node *new_thread = malloc(sizeof(Node));
+    new_thread->tcb = malloc(sizeof(thread_control_block));
+    new_thread->tcb->context = malloc(sizeof(ucontext_t));
     getcontext(new_thread->tcb->context);
-    new_thread->tcb->context->uc_link=return_function;
+    new_thread->tcb->context->uc_link = return_function;
     // initializes a stack for the new thread
-    new_thread->tcb->context->uc_stack.ss_sp= malloc(65536);
-    new_thread->tcb->context->uc_stack.ss_size=65536;
-    new_thread->tcb->context->uc_stack.ss_flags=0;
+    new_thread->tcb->context->uc_stack.ss_sp = malloc(65536);
+    new_thread->tcb->context->uc_stack.ss_size = 65536;
+    new_thread->tcb->context->uc_stack.ss_flags = 0;
     //set pid, status, return_value
-    new_thread->tcb->tid=thread_number;
-    new_thread->tcb->ret_val=NULL;
-    new_thread->tcb->yield_purpose=0;
-    *thread=thread_number;
+    new_thread->tcb->tid = thread_number;
+    new_thread->tcb->ret_val = NULL;
+    new_thread->tcb->yield_purpose = 0;
+    *thread = thread_number;
     thread_number++;
     // change thread context to the function
-    makecontext(new_thread->tcb->context, (void (*)(void ))function, 1, arg);
+    makecontext(new_thread->tcb->context, (void (*)(void)) function, 1, arg);
     //set new thread's priority
-    new_thread->tcb->priority=100;
+    new_thread->tcb->priority = 100;
 
     // change the running queue
-    while (__sync_lock_test_and_set(&modifying_queue,1)==1);
+    while (__sync_lock_test_and_set(&modifying_queue, 1) == 1);
     // add thread into the queue
     add_node_into_queue(QUEUE_NUMBER, new_thread);
     __sync_lock_release(&modifying_queue);
@@ -143,9 +143,51 @@ void mypthread_exit(void *value_ptr) {
 int mypthread_join(mypthread_t thread, void **value_ptr) {
     // TODO
     // YOUR CODE HERE
-    pthread_join(thread, value_ptr);
-    // wait for a specific thread to terminate
-    // deallocate any dynamic memory created by the joining thread
+    // printf("\nJoining\n");
+    // lock queue
+    if (__sync_lock_test_and_set(&modifying_queue, 1) == 1)
+    {
+        // printf("ERRIR: queue locked when joining\n");
+        return -1; // another thead locks the queue, should not happen
+    }
+
+    // check if the thread has already finished
+    exit_t_node *p = scheduler->exit_thread_list;
+    while (p != NULL) {
+        if (thread == p->tid) {
+            // printf("thread already exit, return directly\n");
+            __sync_lock_release(&modifying_queue);
+            return 1;
+        }
+        p = p->next;
+    }
+    // create new waiting node
+    // printf("Making new node\n");
+    join_waiting_queue_node *new_node = (join_waiting_queue_node *) malloc(sizeof(join_waiting_queue_node));
+    new_node->tcb = get_current_thread()->tcb;
+    new_node->tid = thread;
+    new_node->value_pointer = NULL;
+    new_node->next = NULL;
+    // printf("Setting value ptr\n");
+    new_node->value_pointer = value_ptr;
+    // printf("Finished making new node\n");
+    // add to wait queue
+    if (scheduler->join_waiting_queue == NULL) {
+        scheduler->join_waiting_queue = new_node;
+    } else {
+        join_waiting_queue_node *ptr = scheduler->join_waiting_queue;
+        while (ptr->next != NULL) {
+            ptr = ptr->next;
+        }
+        ptr->next = new_node;
+    }
+    // set flag for scheduler
+    get_current_thread()->tcb->yield_purpose = 2;
+    // unlock queue mutex
+    // printf("join finished, going to yield()\n");
+    __sync_lock_release(&modifying_queue);
+    mypthread_yield();
+    //Wait for the other thread to finish executing
 
     return 0;
 };
@@ -154,11 +196,11 @@ int mypthread_join(mypthread_t thread, void **value_ptr) {
 int mypthread_mutex_init(mypthread_mutex_t *mutex, const pthread_mutexattr_t *mutexattr) {
     // YOUR CODE HERE
     // set 1 means it has not been deleted
-    mutex->initialized=1;
+    mutex->initialized = 1;
     // open mutex lock
     __sync_lock_release(&(mutex->mutex_lock));
     // initial mutex id
-    mutex->mid=mutex_id;
+    mutex->mid = mutex_id;
     mutex_id++;
 
     //initialize data structures for this mutex
@@ -169,24 +211,24 @@ int mypthread_mutex_init(mypthread_mutex_t *mutex, const pthread_mutexattr_t *mu
 /* aquire a mutex lock */
 int mypthread_mutex_lock(mypthread_mutex_t *mutex) {
     // YOUR CODE HERE
-    if(mutex->initialized!=1){
+    if (mutex->initialized != 1) {
         return -1;
     }
 
     // use the built-in test-and-set atomic function to test the mutex
-    if(__sync_lock_test_and_set(&(mutex->mutex_lock),1)==0){
+    if (__sync_lock_test_and_set(&(mutex->mutex_lock), 1) == 0) {
         // if the mutex is acquired successfully, return
-        mutex->tid=get_current_thread()->tcb->tid;
+        mutex->tid = get_current_thread()->tcb->tid;
         return 0;
     }
     // if acquiring mutex fails, put the current thread on the blocked/waiting list and context switch to the scheduler thread
     // initialize a new mutex waiting queue node
-    mutex_waiting_queue_node *wait_node= malloc(sizeof(mutex_waiting_queue_node));
-    Node *current_thread=get_current_thread();
-    wait_node->thread=current_thread->tcb;
-    current_thread->tcb->yield_purpose=2;
-    wait_node->mutex_lock=mutex->mid;
-    wait_node->next=NULL;
+    mutex_waiting_queue_node *wait_node = malloc(sizeof(mutex_waiting_queue_node));
+    Node *current_thread = get_current_thread();
+    wait_node->thread = current_thread->tcb;
+    current_thread->tcb->yield_purpose = 2;
+    wait_node->mutex_lock = mutex->mid;
+    wait_node->next = NULL;
     // add into waiting queue
     add_to_mutex_waiting_queue(wait_node);
     mypthread_yield();
@@ -198,38 +240,38 @@ int mypthread_mutex_lock(mypthread_mutex_t *mutex) {
 int mypthread_mutex_unlock(mypthread_mutex_t *mutex) {
     // YOUR CODE HERE
     // if mutex is destroyed, return -1
-    if(mutex->initialized!=1){
+    if (mutex->initialized != 1) {
         return -1;
     }
-    if(get_current_thread()->tcb->tid==mutex->tid){
+    if (get_current_thread()->tcb->tid == mutex->tid) {
         // update the mutex's metadata to indicate it is unlocked
         __sync_lock_release(&(mutex->mutex_lock));
         // thread start from 0
-        mutex->tid=-1;
-        mutex_waiting_queue_node *ptr=scheduler->mutex_waiting_queue;
-        mutex_waiting_queue_node *pre=NULL;
+        mutex->tid = -1;
+        mutex_waiting_queue_node *ptr = scheduler->mutex_waiting_queue;
+        mutex_waiting_queue_node *pre = NULL;
         // remove all the node from mutex waiting queue that has relationship with mutex id
-        while (ptr!=NULL){
-            if(ptr->mutex_lock==mutex->mid){
-                if(pre==NULL){
-                    scheduler->mutex_waiting_queue=ptr->next;
-                } else{
-                    pre->next=ptr->next;
+        while (ptr != NULL) {
+            if (ptr->mutex_lock == mutex->mid) {
+                if (pre == NULL) {
+                    scheduler->mutex_waiting_queue = ptr->next;
+                } else {
+                    pre->next = ptr->next;
                 }
-                Node *node= malloc(sizeof(Node));
-                node->tcb=ptr->thread;
-                node->next=NULL;
+                Node *node = malloc(sizeof(Node));
+                node->tcb = ptr->thread;
+                node->next = NULL;
                 // add lock to modify queue
-                while (__sync_lock_test_and_set(&modifying_queue,1)==1);
+                while (__sync_lock_test_and_set(&modifying_queue, 1) == 1);
                 // put the thread at the front of this mutex's blocked/waiting queue in to the run queue
                 add_to_run_queue_priority_based(node);
                 __sync_lock_release(&modifying_queue);
-                mutex_waiting_queue_node *tmp=ptr;
-                ptr=ptr->next;
+                mutex_waiting_queue_node *tmp = ptr;
+                ptr = ptr->next;
                 free(tmp);
-            } else{
-                pre=ptr;
-                ptr=ptr->next;
+            } else {
+                pre = ptr;
+                ptr = ptr->next;
             }
         }
 
@@ -242,8 +284,8 @@ int mypthread_mutex_unlock(mypthread_mutex_t *mutex) {
 int mypthread_mutex_destroy(mypthread_mutex_t *mutex) {
     // YOUR CODE HERE
     // deallocate dynamic memory allocated during mypthread_mutex_init
-    while (__sync_lock_test_and_set(&(mutex->mutex_lock),1)==1);
-    mutex->initialized=0;
+    while (__sync_lock_test_and_set(&(mutex->mutex_lock), 1) == 1);
+    mutex->initialized = 0;
     free(mutex);
 
     return 0;
@@ -307,7 +349,7 @@ int check_queue_is_empty() {
 
 // YOUR CODE HERE
 
-int add_to_run_queue(int num, Node *node){
+int add_to_run_queue(int num, Node *node) {
     //	If there are no running threads in the given run queue, make the thread the beginning of the queue
     if (num == 1) {
         if (scheduler->round_robin_queue_T1 == NULL) {
@@ -395,20 +437,17 @@ int thread_handle(Node *ptr) {
             }
             break;
         }
-        case 2:
-        {
+        case 2: {
             // printf("join() or mutex_lock() happened, handling ... \n");
             // join and mutex_lock()
             ptr->tcb->yield_purpose = 0;
             break;
         }
-        case 3:
-        {
+        case 3: {
             // printf("yield() happened, handling ... \n");
             //yield()
             Node *first_node;
-            switch (scheduler->current_queue_number)
-            {
+            switch (scheduler->current_queue_number) {
                 case 1:
                     first_node = scheduler->round_robin_queue_T1->head->next;
                     break;
@@ -461,7 +500,7 @@ void add_to_run_queue_priority_based(Node *node) {
     insertBefore(scheduler->round_robin_queue_T1, node, end);
 }
 
-int get_highest_priority(){
+int get_highest_priority() {
     //	If the queue is already being modified, wait for the operation to finish, then continue
 
     //Don't need to lock, the only time this function is called is inside the scheduler
@@ -472,26 +511,21 @@ int get_highest_priority(){
     int highest_priority = 0;
     int highest_priority_queue = 0;
     //	If the first queue isn't empty, then it is the highest so far
-    if (scheduler->round_robin_queue_T1 != NULL)
-    {
+    if (scheduler->round_robin_queue_T1 != NULL) {
         highest_priority = scheduler->round_robin_queue_T1->head->next->tcb->priority;
         highest_priority_queue = 1;
     }
     //	Compare the priority of the first element in the second queue
-    if (scheduler->second_running_queue != NULL)
-    {
+    if (scheduler->second_running_queue != NULL) {
         thread_node *ptr = scheduler->second_running_queue;
-        if (scheduler->second_running_queue->thread->priority > highest_priority)
-        {
+        if (scheduler->second_running_queue->thread->priority > highest_priority) {
             highest_priority = scheduler->round_robin_queue_T2->head->next->tcb->priority;
             highest_priority_queue = 2;
         }
     }
     //	Compare the priority of the first element in the third queue
-    if (scheduler->third_running_queue != NULL)
-    {
-        if (scheduler->third_running_queue->thread->priority > highest_priority)
-        {
+    if (scheduler->third_running_queue != NULL) {
+        if (scheduler->third_running_queue->thread->priority > highest_priority) {
             highest_priority = scheduler->round_robin_queue_T3->head->next->tcb->priority;
             highest_priority_queue = 3;
         }
@@ -508,15 +542,20 @@ int swap_context() {
     }
     // printf("\nswap contexts\n");
     //	If another function is modifying the queue, wait for it to finish before working
-    while (__sync_lock_test_and_set(&modifying_queue, 1) == 1);
-    // printf("someone modifying the queue, return for now, come back soon\n");
-    timer.it_interval.tv_usec = 1000;
+    if (__sync_lock_test_and_set(&modifying_queue, 1) == 1)
+    {
+        // printf("someone modifying the queue, return for now, come back soon\n");
+        timer.it_interval.tv_usec = 1000;
+        return 0;
+    }
     //	If the scheduler is already running, don't do anything
-    while (__sync_lock_test_and_set(&scheduler_running, 1) == 1);
+    if (__sync_lock_test_and_set(&scheduler_running, 1) == 1)
+    {
+        // printf("scheduler is running, return\n");
+        return 0;
+    }
 
     // read_queues();
-    thread_node *ptr;
-    thread_node *current_running_queue;
     //	Depending on which run queue was running, change the priority of the current thread
 
     // printf("preparing to handle yield(), running queue is %d\nprinting current tcb:", scheduler->current_queue_number);
@@ -707,15 +746,15 @@ int add_node_into_queue(int running_queue_number, Node *threadNode) {
     return 0;
 }
 
-int add_to_mutex_waiting_queue(mutex_waiting_queue_node* node){
-    if(scheduler->mutex_waiting_queue==NULL){
-        scheduler->mutex_waiting_queue=node;
+int add_to_mutex_waiting_queue(mutex_waiting_queue_node *node) {
+    if (scheduler->mutex_waiting_queue == NULL) {
+        scheduler->mutex_waiting_queue = node;
         return 0;
     }
-    mutex_waiting_queue_node *ptr=scheduler->mutex_waiting_queue;
-    while (ptr->next!=NULL){
-        ptr=ptr->next;
+    mutex_waiting_queue_node *ptr = scheduler->mutex_waiting_queue;
+    while (ptr->next != NULL) {
+        ptr = ptr->next;
     }
-    ptr->next=node;
+    ptr->next = node;
     return 0;
 }
