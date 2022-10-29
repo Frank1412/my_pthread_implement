@@ -7,7 +7,7 @@
 
 #include<stdlib.h>
 #include <stdlib.h>
-#include "mypthread.h"
+//#include "mypthread.h"
 
 typedef struct Node {
     struct Node *prev;

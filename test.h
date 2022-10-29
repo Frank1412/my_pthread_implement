@@ -20,10 +20,22 @@
 #include <stdlib.h>
 #include <ucontext.h>
 #include <signal.h>
-#include "Queue.h"
-#include "para.h"
+
 
 typedef uint mypthread_t;
+
+typedef struct Node {
+    struct Node *prev;
+    struct Node *next;
+    struct thread_control_block *tcb;
+} Node;
+
+typedef struct Queue {
+    struct Node *head;
+    struct Node *rear;
+    int size;
+} Queue;
+
 
 typedef struct exit_t_node {
     mypthread_t tid;
@@ -111,14 +123,16 @@ typedef struct Scheduler {
     Node *current_thread;
 } Scheduler;
 
-// global variables
-Scheduler *scheduler;
-struct itimerval timer;
-int scheduler_running; // binary semaphore
-int modifying_queue; // binary semaphore
-ucontext_t *return_function;
-mypthread_t thread_number;
-uint mutex_id;
+//// global variables
+//Scheduler *scheduler;
+//struct itimerval timer;
+//int scheduler_running; // binary semaphore
+//int modifying_queue; // binary semaphore
+//ucontext_t *return_function;
+//mypthread_t thread_number;
+//uint mutex_id;
+//int TIMER_PARA=25000;
+//int QUEUE_NUMBER=1;
 
 
 /* Function Declarations: */
@@ -179,6 +193,26 @@ void add_waiting_time();
 
 int add_to_run_queue(int num, Node *node);
 
+
+
+Queue *initQueue();
+
+int isEmpty(Queue *queue);
+
+void addFront(Queue *queue, Node *node);
+
+int addBack(Queue *queue, Node *node);
+
+void removeNode(Queue *queue, Node *node);
+
+void insertBefore(Queue* queue, Node *node, Node *pivot);
+
+Node* removeFront(Queue *queue);
+
+Node* removeBack(Queue *queue);
+
+
+
 #ifdef USE_MYTHREAD
 #define pthread_t mypthread_t
 #define pthread_mutex_t mypthread_mutex_t
@@ -190,5 +224,7 @@ int add_to_run_queue(int num, Node *node);
 #define pthread_mutex_unlock mypthread_mutex_unlock
 #define pthread_mutex_destroy mypthread_mutex_destroy
 #endif
+
+
 
 #endif

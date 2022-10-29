@@ -7,5 +7,5 @@
 
 #endif //MYPTHREAD_PARA_H
 
-int TIMER_PARA=25000;
-int QUEUE_NUMBER=1;
+//int TIMER_PARA;
+//int QUEUE_NUMBER;

@@ -1,13 +1,24 @@
+//
+// Created by JintongWang on 10/29/2022.
+//
+
+#include "test.h"
 // File:	mypthread.c
 
-// List all group members' names:
-// iLab machine tested on:
-
-#include "mypthread.h"
 
 // INITAILIZE ALL YOUR VARIABLES HERE
 // YOUR CODE HERE
 
+// global variables
+Scheduler *scheduler;
+struct itimerval timer;
+int scheduler_running; // binary semaphore
+int modifying_queue; // binary semaphore
+ucontext_t *return_function;
+mypthread_t thread_number;
+uint mutex_id;
+int TIMER_PARA=2500;
+int QUEUE_NUMBER=1;
 
 /* create a new thread */
 int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function)(void *), void *arg) {
@@ -500,21 +511,21 @@ int check_queue_is_empty() {
 int add_to_run_queue(int num, Node *node) {
     //	If there are no running threads in the given run queue, make the thread the beginning of the queue
     if (num == 1) {
-        if (scheduler->round_robin_queue_T1 == NULL) {
+        if (scheduler->round_robin_queue_T1 != NULL) {
             addBack(scheduler->round_robin_queue_T1, node);
             __sync_lock_release(&modifying_queue);
             return 0;
         }
     }
     if (num == 2) {
-        if (scheduler->round_robin_queue_T2 == NULL) {
+        if (scheduler->round_robin_queue_T2 != NULL) {
             addBack(scheduler->round_robin_queue_T2, node);
             __sync_lock_release(&modifying_queue);
             return 0;
         }
     }
     if (num == 3) {
-        if (scheduler->round_robin_queue_T2 == NULL) {
+        if (scheduler->round_robin_queue_T2 != NULL) {
             addBack(scheduler->round_robin_queue_T2, node);
             __sync_lock_release(&modifying_queue);
             return 0;
@@ -784,4 +795,75 @@ void add_waiting_time(){
         ptr->tcb->waiting_time+=iteration_time;
     }
     return;
+}
+
+
+Queue *initQueue(){
+    Queue *queue = (Queue *)malloc(sizeof(Queue));
+    queue->head = (Node*) malloc(sizeof(Node));
+    queue->rear = (Node*) malloc(sizeof(Node));
+    queue->head->next = queue->rear;
+    queue->head->prev = NULL;
+    queue->rear->prev = queue->head;
+    queue->rear->next = NULL;
+    queue->size = 0;
+    return queue;
+}
+
+int isEmpty(Queue *queue){
+    return queue->size == 0 ;
+}
+
+void addFront(Queue *queue, Node *node){
+    node->next = queue->head->next;
+    node->next->prev = node;
+    node->prev = queue->head;
+    queue->head->next = node;
+    queue->size ++;
+}
+
+int addBack(Queue *queue, Node *node){
+    node->next = queue->rear;
+    node->prev = queue->rear->prev;
+    queue->rear->prev = node;
+    node->prev->next = node;
+    queue->size ++;
+}
+
+void removeNode(Queue *queue, Node *node){
+    Node *prev = node->prev, *next=node->next;
+    prev->next = next;
+    next->prev = prev;
+    node->next = NULL;
+    node->prev = NULL;
+    queue->size--;
+}
+
+void insertBefore(Queue* queue, Node *node, Node *pivot){
+    Node *prev = pivot->prev;
+    node->prev = prev;
+    node->next = pivot;
+    pivot->prev = node;
+    prev->next = node;
+    queue->size ++;
+}
+
+Node* removeFront(Queue *queue){
+    Node* ret = queue->head->next;
+    queue->head->next = ret->next;
+    ret->next->prev = queue->head;
+    ret->prev = NULL;
+    ret->next = NULL;
+    queue->size--;
+    return ret;
+}
+
+Node* removeBack(Queue *queue){
+    Node* ret = queue->rear->prev;
+    queue->rear->prev = ret->prev;
+    ret->prev->next = queue->rear;
+    ret->prev = NULL;
+    ret->next = NULL;
+    queue->size--;
+    return ret;
 }
