@@ -121,10 +121,12 @@ uint mutex_id;
 /* Function Declarations: */
 Node *get_current_thread();
 
+int get_highest_priority();
+
 void add_to_run_queue_priority_based(Node *new_node);
 
 // swap thread context
-int swap_contexts();
+int swap_context();
 
 /* create a new thread */
 int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function)(void *), void *arg);
