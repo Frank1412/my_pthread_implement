@@ -78,7 +78,7 @@ typedef struct my_pthread_mutex_t {
     my_pthread_t pid;
     int mutex_lock;
     uint mid;
-};
+}my_pthread_mutex_t;
 
 typedef struct join_waiting_queue_node {
     thread_control_block *tcb;
