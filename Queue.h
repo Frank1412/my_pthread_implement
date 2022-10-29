@@ -29,7 +29,7 @@ void addFront(Queue *queue, Node *node);
 
 int addBack(Queue *queue, Node *node);
 
-void removeNode(Node *node);
+void removeNode(Queue *queue, Node *node);
 
 void insertBefore(Queue* queue, Node *node, Node *pivot);
 

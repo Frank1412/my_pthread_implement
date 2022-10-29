@@ -295,6 +295,20 @@ int mypthread_mutex_destroy(mypthread_mutex_t *mutex) {
 static void schedule() {
     // TODO
     // YOUR CODE HERE
+    switch (QUEUE_NUMBER){
+        case 1:
+            sched_RR();
+            break;
+        case 2:
+            sched_PSJF();
+            break;
+        case 3:
+            sched_MLFQ();
+            break;
+        default:
+            sched_RR();
+            break;
+    }
 
     // each time a timer signal occurs your library should switch in to this context
 
@@ -330,12 +344,141 @@ static void sched_PSJF() {
 /* Graduate Students Only */
 static void sched_MLFQ() {
     // TODO
-    // YOUR CODE HERE
+    // read_queues();
+    //	Depending on which run queue was running, change the priority of the current thread
 
-    // Your own implementation of MLFQ
-    // (feel free to modify arguments and return types)
+    // printf("preparing to handle yield(), running queue is %d\nprinting current tcb:", scheduler->current_queue_number);
+    // read_queues();
+    Node *ptr = get_current_thread();
+    switch (scheduler->current_queue_number) {
+        //		If a thread in the first run queue was running, age every other thread, then move it to the second run queue and set its priority to 50.
+        case 1:
+            removeNode(scheduler->round_robin_queue_T1, ptr);
+            age();
+            thread_handle(ptr);
+            break;
+            //		If a thread in the second run queue was running, age every other thread, then move it to the third run queue and set its priority to 0.
+        case 2:
+            removeNode(scheduler->round_robin_queue_T2, ptr);
+            age();
+            thread_handle(ptr);
+            break;
+            //		If a thread in the third run queue was running, then it must be finished, because all threads there run to completion.
+        case 3:
+            removeNode(scheduler->round_robin_queue_T3, ptr);
+            age();
+            thread_handle(ptr);
+            break;
+            //		If none of the above, then something went wrong.
+        default:
+            __sync_lock_release(&scheduler_running);
+            __sync_lock_release(&modifying_queue);
+            return ;
+    }
+    //	Depending on which queue has the highest first priority, switch the context to run that thread
 
-    return;
+    // printf("done\nready to swapcontext()\nprint tcb:");
+    // read_queues();
+    switch (get_highest_priority()) {
+        //		If there are no more threads, then do nothing.
+        case 0:
+            __sync_lock_release(&scheduler_running);
+            __sync_lock_release(&modifying_queue);
+            break;
+            //		If the first queue has the highest priority thread, switch to that one.
+        case 1:
+            scheduler->current_queue_number = 1;
+            getitimer(ITIMER_VIRTUAL, &timer);
+            timer.it_value.tv_usec = 2500;
+            timer.it_interval.tv_usec = 250;
+            setitimer(ITIMER_VIRTUAL, &timer, NULL);
+            if (ptr->tcb->tid == scheduler->round_robin_queue_T1->head->next->tcb->tid) { // this is the only thread
+                __sync_lock_release(&scheduler_running);
+                __sync_lock_release(&modifying_queue);
+                // setcontext(ptr->thread->context);
+                return ;
+            }
+            // free space
+            if (ptr->tcb->yield_purpose == 1 && ptr->tcb->tid != 0) {
+                free(ptr->tcb->context->uc_stack.ss_sp);
+                free(ptr->tcb->context);
+                free(ptr->tcb);
+                free(ptr);
+                __sync_lock_release(&scheduler_running);
+                __sync_lock_release(&modifying_queue);
+                setcontext(scheduler->round_robin_queue_T1->head->next->tcb->context);
+            }
+            __sync_lock_release(&scheduler_running);
+            __sync_lock_release(&modifying_queue);
+            scheduler->current_thread = scheduler->round_robin_queue_T1->head->next;
+            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
+            break;
+            //		If the second queue has the highest priority thread, switch to that one.
+        case 2:
+            scheduler->current_queue_number = 2;
+            getitimer(ITIMER_VIRTUAL, &timer);
+            timer.it_value.tv_usec = 5000;
+            timer.it_interval.tv_usec = 5000;
+            setitimer(ITIMER_VIRTUAL, &timer, NULL);
+            if (ptr->tcb->tid == scheduler->round_robin_queue_T2->head->next->tcb->tid) { // this is the only thread
+                __sync_lock_release(&scheduler_running);
+                __sync_lock_release(&modifying_queue);
+                // setcontext(ptr->thread->context);
+                return ;
+            }
+            // free space
+            if (ptr->tcb->yield_purpose == 1 && ptr->tcb->tid != 0) {
+                free(ptr->tcb->context->uc_stack.ss_sp);
+                free(ptr->tcb->context);
+                free(ptr->tcb);
+                free(ptr);
+                __sync_lock_release(&scheduler_running);
+                __sync_lock_release(&modifying_queue);
+                setcontext(scheduler->round_robin_queue_T2->head->next->tcb->context);
+            }
+            __sync_lock_release(&scheduler_running);
+            __sync_lock_release(&modifying_queue);
+            scheduler->current_thread = scheduler->round_robin_queue_T2->head->next;
+            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T2->head->next->tcb->context);
+            break;
+            //		If the third queue has the highest priority thread, switch to that one.
+        case 3:
+            scheduler->current_queue_number = 3;
+            getitimer(ITIMER_VIRTUAL, &timer);
+            timer.it_value.tv_usec = 0;
+            timer.it_interval.tv_usec = 0;
+            setitimer(ITIMER_VIRTUAL, &timer, NULL);
+            if (ptr->tcb->tid == scheduler->round_robin_queue_T3->head->next->tcb->tid) { // this is the only thread
+                __sync_lock_release(&scheduler_running);
+                __sync_lock_release(&modifying_queue);
+                // setcontext(ptr->thread->context);
+                return ;
+            }
+            // free space
+            if (ptr->tcb->yield_purpose == 1 && ptr->tcb->tid != 0) {
+                free(ptr->tcb->context->uc_stack.ss_sp);
+                free(ptr->tcb->context);
+                free(ptr->tcb);
+                free(ptr);
+                __sync_lock_release(&scheduler_running);
+                __sync_lock_release(&modifying_queue);
+                setcontext(scheduler->round_robin_queue_T3->head->next->tcb->context);
+            }
+            __sync_lock_release(&scheduler_running);
+            __sync_lock_release(&modifying_queue);
+            scheduler->current_thread = scheduler->round_robin_queue_T3->head->next;
+            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T3->head->next->tcb->context);
+            break;
+        default:
+            //		If none of the above, then something went wrong.
+            // free(ptr->thread->context);
+            // free(ptr->thread);
+            // free(ptr);
+            __sync_lock_release(&scheduler_running);
+            __sync_lock_release(&modifying_queue);
+            return ;
+    }
+
 }
 
 // Feel free to add any other functions you need
@@ -516,16 +659,15 @@ int get_highest_priority() {
         highest_priority_queue = 1;
     }
     //	Compare the priority of the first element in the second queue
-    if (scheduler->second_running_queue != NULL) {
-        thread_node *ptr = scheduler->second_running_queue;
-        if (scheduler->second_running_queue->thread->priority > highest_priority) {
+    if (scheduler->round_robin_queue_T2 != NULL) {
+        if (scheduler->round_robin_queue_T2->head->next->tcb->priority > highest_priority) {
             highest_priority = scheduler->round_robin_queue_T2->head->next->tcb->priority;
             highest_priority_queue = 2;
         }
     }
     //	Compare the priority of the first element in the third queue
-    if (scheduler->third_running_queue != NULL) {
-        if (scheduler->third_running_queue->thread->priority > highest_priority) {
+    if (scheduler->round_robin_queue_T3 != NULL) {
+        if (scheduler->round_robin_queue_T3->head->next->tcb->priority > highest_priority) {
             highest_priority = scheduler->round_robin_queue_T3->head->next->tcb->priority;
             highest_priority_queue = 3;
         }
@@ -554,141 +696,9 @@ int swap_context() {
         // printf("scheduler is running, return\n");
         return 0;
     }
+    schedule();
 
-    // read_queues();
-    //	Depending on which run queue was running, change the priority of the current thread
 
-    // printf("preparing to handle yield(), running queue is %d\nprinting current tcb:", scheduler->current_queue_number);
-    // read_queues();
-    Node *ptr = get_current_thread();
-    switch (scheduler->current_queue_number) {
-        //		If a thread in the first run queue was running, age every other thread, then move it to the second run queue and set its priority to 50.
-        case 1:
-            removeNode(scheduler->round_robin_queue_T1, ptr);
-            age();
-            thread_handle(ptr);
-            break;
-            //		If a thread in the second run queue was running, age every other thread, then move it to the third run queue and set its priority to 0.
-        case 2:
-            removeNode(scheduler->round_robin_queue_T2, ptr);
-            age();
-            thread_handle(ptr);
-            break;
-            //		If a thread in the third run queue was running, then it must be finished, because all threads there run to completion.
-        case 3:
-            removeNode(scheduler->round_robin_queue_T3, ptr);
-            age();
-            thread_handle(ptr);
-            break;
-            //		If none of the above, then something went wrong.
-        default:
-            __sync_lock_release(&scheduler_running);
-            __sync_lock_release(&modifying_queue);
-            return -1;
-    }
-    //	Depending on which queue has the highest first priority, switch the context to run that thread
-
-    // printf("done\nready to swapcontext()\nprint tcb:");
-    // read_queues();
-    switch (get_highest_priority()) {
-        //		If there are no more threads, then do nothing.
-        case 0:
-            __sync_lock_release(&scheduler_running);
-            __sync_lock_release(&modifying_queue);
-            break;
-            //		If the first queue has the highest priority thread, switch to that one.
-        case 1:
-            scheduler->current_queue_number = 1;
-            getitimer(ITIMER_VIRTUAL, &timer);
-            timer.it_value.tv_usec = 250;
-            timer.it_interval.tv_usec = 250;
-            setitimer(ITIMER_VIRTUAL, &timer, NULL);
-            if (ptr->tcb->tid == scheduler->round_robin_queue_T1->head->next->tcb->tid) { // this is the only thread
-                __sync_lock_release(&scheduler_running);
-                __sync_lock_release(&modifying_queue);
-                // setcontext(ptr->thread->context);
-                return 0;
-            }
-            // free space
-            if (ptr->tcb->yield_purpose == 1 && ptr->tcb->tid != 0) {
-                free(ptr->tcb->context->uc_stack.ss_sp);
-                free(ptr->tcb->context);
-                free(ptr->tcb);
-                free(ptr);
-                __sync_lock_release(&scheduler_running);
-                __sync_lock_release(&modifying_queue);
-                setcontext(scheduler->round_robin_queue_T1->head->next->tcb->context);
-            }
-            __sync_lock_release(&scheduler_running);
-            __sync_lock_release(&modifying_queue);
-            scheduler->current_thread = scheduler->round_robin_queue_T1->head->next;
-            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
-            break;
-            //		If the second queue has the highest priority thread, switch to that one.
-        case 2:
-            scheduler->current_queue_number = 2;
-            getitimer(ITIMER_VIRTUAL, &timer);
-            timer.it_value.tv_usec = 5000;
-            timer.it_interval.tv_usec = 5000;
-            setitimer(ITIMER_VIRTUAL, &timer, NULL);
-            if (ptr->tcb->tid == scheduler->round_robin_queue_T2->head->next->tcb->tid) { // this is the only thread
-                __sync_lock_release(&scheduler_running);
-                __sync_lock_release(&modifying_queue);
-                // setcontext(ptr->thread->context);
-                return 0;
-            }
-            // free space
-            if (ptr->tcb->yield_purpose == 1 && ptr->tcb->tid != 0) {
-                free(ptr->tcb->context->uc_stack.ss_sp);
-                free(ptr->tcb->context);
-                free(ptr->tcb);
-                free(ptr);
-                __sync_lock_release(&scheduler_running);
-                __sync_lock_release(&modifying_queue);
-                setcontext(scheduler->round_robin_queue_T2->head->next->tcb->context);
-            }
-            __sync_lock_release(&scheduler_running);
-            __sync_lock_release(&modifying_queue);
-            scheduler->current_thread = scheduler->round_robin_queue_T2->head->next;
-            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T2->head->next->tcb->context);
-            break;
-            //		If the third queue has the highest priority thread, switch to that one.
-        case 3:
-            scheduler->current_queue_number = 3;
-            getitimer(ITIMER_VIRTUAL, &timer);
-            timer.it_value.tv_usec = 0;
-            timer.it_interval.tv_usec = 0;
-            setitimer(ITIMER_VIRTUAL, &timer, NULL);
-            if (ptr->tcb->tid == scheduler->round_robin_queue_T3->head->next->tcb->tid) { // this is the only thread
-                __sync_lock_release(&scheduler_running);
-                __sync_lock_release(&modifying_queue);
-                // setcontext(ptr->thread->context);
-                return 0;
-            }
-            // free space
-            if (ptr->tcb->yield_purpose == 1 && ptr->tcb->tid != 0) {
-                free(ptr->tcb->context->uc_stack.ss_sp);
-                free(ptr->tcb->context);
-                free(ptr->tcb);
-                free(ptr);
-                __sync_lock_release(&scheduler_running);
-                __sync_lock_release(&modifying_queue);
-                setcontext(scheduler->round_robin_queue_T3->head->next->tcb->context);
-            }
-            __sync_lock_release(&scheduler_running);
-            __sync_lock_release(&modifying_queue);
-            scheduler->current_thread = scheduler->round_robin_queue_T3->head->next;
-            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T3->head->next->tcb->context);
-            break;
-        default:
-            //		If none of the above, then something went wrong.
-            // free(ptr->thread->context);
-            // free(ptr->thread);
-            // free(ptr);
-            __sync_lock_release(&scheduler_running);
-            __sync_lock_release(&modifying_queue);
-            return -1;
-    }
     return 0;
 }
 

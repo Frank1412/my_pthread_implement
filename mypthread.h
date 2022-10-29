@@ -159,6 +159,10 @@ Scheduler *initial_scheduler();
 
 Node *create_thread_node();
 
+int thread_handle(Node *ptr);
+
+int age();
+
 int add_node_into_queue(int schedulerStyle, Node *threadNode);
 
 int add_to_mutex_waiting_queue(mutex_waiting_queue_node* node)
