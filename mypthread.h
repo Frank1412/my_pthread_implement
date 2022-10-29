@@ -165,7 +165,17 @@ int age();
 
 int add_node_into_queue(int schedulerStyle, Node *threadNode);
 
-int add_to_mutex_waiting_queue(mutex_waiting_queue_node* node)
+int add_to_mutex_waiting_queue(mutex_waiting_queue_node* node);
+
+static void sched_RR();
+
+static void sched_PSJF();
+
+static void sched_MLFQ();
+
+Node *get_most_waiting_time_node(Queue *queue);
+
+void add_waiting_time();
 
 #ifdef USE_MYTHREAD
 #define pthread_t mypthread_t
