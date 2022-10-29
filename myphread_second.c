@@ -148,7 +148,6 @@ static void sched_RR() {
     return;
 }
 static void sched_PSJF() {
-    // TODO
     // YOUR CODE HERE
     Queue *current_running_queue=scheduler->round_robin_queue_T1;
     Node *ptr=get_most_waiting_time_node(current_running_queue);

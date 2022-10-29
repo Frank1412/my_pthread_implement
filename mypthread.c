@@ -320,9 +320,12 @@ static void schedule() {
 
 /* Round Robin scheduling algorithm */
 static void sched_RR() {
-    // TODO
     // YOUR CODE HERE
-
+//    Node *ptr=scheduler->round_robin_queue_T1->head->next;
+    Queue *current_running_queue=scheduler->round_robin_queue_T1;
+    Node *ptr= removeFront(current_running_queue);
+    age();
+    thread_handle(ptr);
     // Your own implementation of RR
     // (feel free to modify arguments and return types)
 
@@ -331,14 +334,20 @@ static void sched_RR() {
 
 /* Preemptive PSJF (STCF) scheduling algorithm */
 static void sched_PSJF() {
-    // TODO
     // YOUR CODE HERE
-
+    Queue *current_running_queue=scheduler->round_robin_queue_T1;
+    Node *ptr=get_most_waiting_time_node(current_running_queue);
+    removeNode(current_running_queue, ptr);
+    ptr->tcb->waiting_time=0;
+    add_waiting_time();
+    age();
+    thread_handle(ptr);
     // Your own implementation of PSJF (STCF)
     // (feel free to modify arguments and return types)
 
     return;
 }
+
 
 /* Preemptive MLFQ scheduling algorithm */
 /* Graduate Students Only */
@@ -767,4 +776,28 @@ int add_to_mutex_waiting_queue(mutex_waiting_queue_node *node) {
     }
     ptr->next = node;
     return 0;
+}
+
+Node *get_most_waiting_time_node(Queue *queue){
+    Node *most_waiting_time_node;
+    int most_waiting_time=0;
+    Node *ptr=queue->head->next;
+    while (ptr->next!=NULL){
+        if (most_waiting_time<ptr->tcb->waiting_time){
+            most_waiting_time=ptr->tcb->waiting_time;
+            most_waiting_time_node=ptr;
+        }
+        ptr=ptr->next;
+    }
+    return most_waiting_time_node;
+}
+
+void add_waiting_time(){
+    int iteration_time=timer.it_interval.tv_usec;
+    Queue *current_running_queue=scheduler->round_robin_queue_T1;
+    Node *ptr=current_running_queue->head->next;
+    while (ptr->next!=NULL){
+        ptr->tcb->waiting_time+=iteration_time;
+    }
+    return;
 }
