@@ -75,10 +75,10 @@ typedef struct mutex_waiting_queue_node {
 
 typedef struct my_pthread_mutex_t {
     int initialized;
-    my_pthread_t pid;
+    my_pthread_t tid;
     int mutex_lock;
     uint mid;
-}my_pthread_mutex_t;
+}mypthread_mutex_t;
 
 typedef struct join_waiting_queue_node {
     thread_control_block *tcb;
@@ -157,6 +157,8 @@ Scheduler *initial_scheduler();
 Node *create_thread_node();
 
 int add_node_into_queue(int schedulerStyle, Node *threadNode);
+
+int add_to_mutex_waiting_queue(mutex_waiting_queue_node* node)
 
 #ifdef USE_MYTHREAD
 #define pthread_t mypthread_t

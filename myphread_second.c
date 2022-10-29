@@ -72,7 +72,6 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
     add_node_into_queue(QUEUE_NUMBER, new_thread);
     __sync_lock_release(&modifying_queue);
 
-    // TODO: unfinished......
 
 
     // allocate heap space for this thread's stack
@@ -82,3 +81,56 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
 
     return 0;
 };
+
+int mypthread_mutex_init(mypthread_mutex_t *mutex, const pthread_mutexattr_t *mutexattr) {
+    // YOUR CODE HERE
+    // set 1 means it has not been deleted
+    mutex->initialized=1;
+    // open mutex lock
+    __sync_lock_release(&(mutex->mutex_lock));
+    // initial mutex id
+    mutex->mid=mutex_id;
+    mutex_id++;
+
+    //initialize data structures for this mutex
+
+    return 0;
+};
+int mypthread_mutex_lock(mypthread_mutex_t *mutex) {
+    // YOUR CODE HERE
+    if(mutex->initialized!=1){
+        return -1;
+    }
+
+    // use the built-in test-and-set atomic function to test the mutex
+    if(__sync_lock_test_and_set(&(mutex->mutex_lock),1)==0){
+        // if the mutex is acquired successfully, return
+        mutex->tid=get_current_thread()->tcb->tid;
+        return 0;
+    }
+    // if acquiring mutex fails, put the current thread on the blocked/waiting list and context switch to the scheduler thread
+    // initialize a new mutex waiting queue node
+    mutex_waiting_queue_node *wait_node= malloc(sizeof(mutex_waiting_queue_node));
+    Node *current_thread=get_current_thread();
+    wait_node->thread=current_thread->tcb;
+    current_thread->tcb->yield_purpose=2;
+    wait_node->mutex_lock=mutex->mid;
+    wait_node->next=NULL;
+    // add into waiting queue
+    add_to_mutex_waiting_queue(wait_node);
+    mypthread_yield();
+    return 0;
+};
+
+int add_to_mutex_waiting_queue(mutex_waiting_queue_node* node){
+    if(scheduler->mutex_waiting_queue==NULL){
+        scheduler->mutex_waiting_queue=node;
+        return 0;
+    }
+    mutex_waiting_queue_node *ptr=scheduler->mutex_waiting_queue;
+    while (ptr->next!=NULL){
+        ptr=ptr->next;
+    }
+    ptr->next=node;
+    return 0;
+}
