@@ -68,7 +68,7 @@ typedef enum STATUS {
 typedef struct mutex_waiting_queue_node {
 
     // YOUR CODE HERE
-    tcb *thread;
+    thread_control_block *thread;
     uint mutex_lock;
     struct mutex_waiting_queue_node *next;
 } mutex_waiting_queue_node;
@@ -81,7 +81,7 @@ typedef struct my_pthread_mutex_t {
 };
 
 typedef struct join_waiting_queue_node {
-    tcb *thread;
+    thread_control_block *tcb;
     mypthread_t tid;
     void **value_pointer;
     struct join_waiting_queue_node *next;

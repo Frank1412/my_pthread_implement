@@ -239,24 +239,16 @@ int thread_handle(Node *ptr) {
             join_waiting_queue_node *wait_prev = NULL;
             join_waiting_queue_node *wait_ptr = scheduler->join_waiting_queue;
             while (wait_ptr != NULL) {
-                if (wait_ptr.tid == exit_tid) {// printf("adding thread %u to run queue ... ", wait_ptr->thread->pid);
+                if (wait_ptr->tid == exit_tid) {// printf("adding thread %u to run queue ... ", wait_ptr->thread->pid);
                     // add node to run queue
                     Node *new_node = (Node *) malloc(sizeof(Node));
                     new_node->next = NULL;
                     new_node->prev = NULL;
-                    new_node->tcb = wait_ptr->thread;
+                    new_node->tcb = wait_ptr->tcb;
                     add_to_run_queue_priority_based(new_node);
                     // printf("done, removing from wait queue ... ");
                     // remove node from wait queue
-                    if (wait_prev == NULL) // head of queue
-                    {
-                        scheduler->join_waiting_queue = wait_ptr->next;
-                        //free(wait_ptr);
-                    } else {
-                        wait_prev->next = wait_ptr->next;
-                        //free(wait_ptr);
-                    }
-                    // printf("done\n");
+                    scheduler->join_waiting_queue = wait_ptr->next;
                 }
                 join_waiting_queue_node *tmp = wait_ptr;
                 wait_ptr = wait_ptr->next;
@@ -265,15 +257,15 @@ int thread_handle(Node *ptr) {
             // add pid to finished list
             exit_t_node *finished_ptr = scheduler->exit_thread_list;
             if (finished_ptr == NULL) {
-                scheduler->exit_thread_list = malloc(sizeof(pid_list_node));
-                scheduler->exit_thread_list->pid = exit_pid;
+                scheduler->exit_thread_list = malloc(sizeof(exit_t_node));
+                scheduler->exit_thread_list->tid = exit_tid;
                 scheduler->exit_thread_list->next = NULL;
             } else {
                 while (finished_ptr->next != NULL) {
                     finished_ptr = finished_ptr->next;
                 }
-                finished_ptr->next = malloc(sizeof(pid_list_node));
-                finished_ptr->next->pid = exit_pid;
+                finished_ptr->next = malloc(sizeof(exit_t_node));
+                finished_ptr->next->tid = exit_tid;
                 finished_ptr->next->next = NULL;
             }
             break;
@@ -370,7 +362,7 @@ int swap_context() {
             // free(ptr->thread->context);
             // free(ptr->thread);
             // free(ptr);
-            if (ptr->thread->pid == scheduler->first_running_queue->thread->pid) { // this is the only thread
+            if (ptr->tcb.pid == scheduler->first_running_queue->tcb->pid) { // this is the only thread
                 __sync_lock_release(&scheduler_running);
                 __sync_lock_release(&modifying_queue);
                 // setcontext(ptr->thread->context);
