@@ -15,15 +15,18 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
+#include <signal.h>
 #include "Queue.h"
+#include "para.h"
 
 typedef uint mypthread_t;
 
 typedef struct exit_t_node {
-    my_pthread_t tid;
+    mypthread_t tid;
     struct exit_t_node *next;
 } exit_t_node;
 
@@ -75,7 +78,7 @@ typedef struct mutex_waiting_queue_node {
 
 typedef struct my_pthread_mutex_t {
     int initialized;
-    my_pthread_t tid;
+    mypthread_t tid;
     int mutex_lock;
     uint mid;
 }mypthread_mutex_t;
@@ -114,7 +117,7 @@ struct itimerval timer;
 int scheduler_running; // binary semaphore
 int modifying_queue; // binary semaphore
 ucontext_t *return_function;
-my_pthread_t thread_number;
+mypthread_t thread_number;
 uint mutex_id;
 
 

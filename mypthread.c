@@ -38,7 +38,7 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
     }
     // set a timer to 25ms
     if(timer.it_interval.tv_usec==0){
-        signal(SIGVTALRM, (void (*)(int))& swap_contexts);
+        signal(SIGVTALRM, (void (*)(int))& swap_context);
         getitimer(ITIMER_VIRTUAL, &timer);
         timer.it_value.tv_sec = 0;
         timer.it_value.tv_usec = TIMER_PARA;
@@ -117,7 +117,7 @@ void mypthread_exit(void *value_ptr) {
         // printf("prev and ptr initialized, start iterating:\n");
         while (wait_ptr != NULL) {
             // printf("thread %d:\n", wait_ptr->thread->pid);
-            if (wait_ptr->pid == get_current_thread()->tcb->tid) {
+            if (wait_ptr->tid == get_current_thread()->tcb->tid) {
                 // printf("saving return value\n");
                 if (wait_ptr->value_pointer != NULL) {
                     *(wait_ptr->value_pointer) = value_ptr;
@@ -592,7 +592,7 @@ int swap_context() {
             timer.it_value.tv_usec = 5000;
             timer.it_interval.tv_usec = 5000;
             setitimer(ITIMER_VIRTUAL, &timer, NULL);
-            if (ptr->tcb.tid == scheduler->round_robin_queue_T2->head->next->tcb->tid) { // this is the only thread
+            if (ptr->tcb->tid == scheduler->round_robin_queue_T2->head->next->tcb->tid) { // this is the only thread
                 __sync_lock_release(&scheduler_running);
                 __sync_lock_release(&modifying_queue);
                 // setcontext(ptr->thread->context);
@@ -620,7 +620,7 @@ int swap_context() {
             timer.it_value.tv_usec = 0;
             timer.it_interval.tv_usec = 0;
             setitimer(ITIMER_VIRTUAL, &timer, NULL);
-            if (ptr->tcb.tid == scheduler->round_robin_queue_T3->head->next->tcb->tid) { // this is the only thread
+            if (ptr->tcb->tid == scheduler->round_robin_queue_T3->head->next->tcb->tid) { // this is the only thread
                 __sync_lock_release(&scheduler_running);
                 __sync_lock_release(&modifying_queue);
                 // setcontext(ptr->thread->context);
@@ -674,7 +674,7 @@ Scheduler *initial_scheduler() {
 
 Node *create_thread_node() {
     // create new Node
-    Node *threadNode = malloc(sizeof(thread_container));
+    Node *threadNode = malloc(sizeof(Node));
     threadNode->next = NULL;
     threadNode->prev = NULL;
     // create new thread node

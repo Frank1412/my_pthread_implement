@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include "mypthread.h"
+//#include "mypthread.h"
 
-int main() {
+int main(){
     printf("Hello, World!\n");
-    int a = mypthread_yield();
+//    int a = mypthread_yield();
     return 0;
 
 //    int t1 = mypthread_create();
