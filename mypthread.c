@@ -151,7 +151,7 @@ int mypthread_join(mypthread_t thread, void **value_ptr) {
         return -1; // another thead locks the queue, should not happen
     }
 
-    // check if the thread has already finished
+    // check if the thread has already fiinshed
     exit_t_node *p = scheduler->exit_thread_list;
     while (p != NULL) {
         if (thread == p->tid) {
@@ -420,7 +420,7 @@ static void sched_MLFQ() {
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
             scheduler->current_thread = scheduler->round_robin_queue_T1->head->next;
-            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
+            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
             break;
             //		If the second queue has the highest priority thread, switch to that one.
         case 2:
@@ -448,7 +448,7 @@ static void sched_MLFQ() {
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
             scheduler->current_thread = scheduler->round_robin_queue_T2->head->next;
-            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T2->head->next->tcb->context);
+            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T2->head->next->tcb->context);
             break;
             //		If the third queue has the highest priority thread, switch to that one.
         case 3:
@@ -476,7 +476,7 @@ static void sched_MLFQ() {
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
             scheduler->current_thread = scheduler->round_robin_queue_T3->head->next;
-            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T3->head->next->tcb->context);
+            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T3->head->next->tcb->context);
             break;
         default:
             //		If none of the above, then something went wrong.
