@@ -105,6 +105,7 @@ void mypthread_exit(void *value_ptr) {
 
 /* Wait for thread termination */
 int mypthread_join(mypthread_t thread, void **value_ptr) {
+    // TODO
     // YOUR CODE HERE
     pthread_join(thread, value_ptr);
     // wait for a specific thread to terminate
@@ -115,6 +116,7 @@ int mypthread_join(mypthread_t thread, void **value_ptr) {
 
 /* initialize the mutex lock */
 int mypthread_mutex_init(mypthread_mutex_t *mutex, const pthread_mutexattr_t *mutexattr) {
+    // TODO
     // YOUR CODE HERE
 
     //initialize data structures for this mutex
@@ -124,6 +126,7 @@ int mypthread_mutex_init(mypthread_mutex_t *mutex, const pthread_mutexattr_t *mu
 
 /* aquire a mutex lock */
 int mypthread_mutex_lock(mypthread_mutex_t *mutex) {
+    // TODO
     // YOUR CODE HERE
 
     // use the built-in test-and-set atomic function to test the mutex
@@ -135,6 +138,7 @@ int mypthread_mutex_lock(mypthread_mutex_t *mutex) {
 
 /* release the mutex lock */
 int mypthread_mutex_unlock(mypthread_mutex_t *mutex) {
+    // TODO
     // YOUR CODE HERE
 
     // update the mutex's metadata to indicate it is unlocked
@@ -146,6 +150,7 @@ int mypthread_mutex_unlock(mypthread_mutex_t *mutex) {
 
 /* destroy the mutex */
 int mypthread_mutex_destroy(mypthread_mutex_t *mutex) {
+    // TODO
     // YOUR CODE HERE
 
     // deallocate dynamic memory allocated during mypthread_mutex_init
@@ -155,6 +160,7 @@ int mypthread_mutex_destroy(mypthread_mutex_t *mutex) {
 
 /* scheduler */
 static void schedule() {
+    // TODO
     // YOUR CODE HERE
 
     // each time a timer signal occurs your library should switch in to this context
@@ -167,6 +173,7 @@ static void schedule() {
 
 /* Round Robin scheduling algorithm */
 static void sched_RR() {
+    // TODO
     // YOUR CODE HERE
 
     // Your own implementation of RR
@@ -177,6 +184,7 @@ static void sched_RR() {
 
 /* Preemptive PSJF (STCF) scheduling algorithm */
 static void sched_PSJF() {
+    // TODO
     // YOUR CODE HERE
 
     // Your own implementation of PSJF (STCF)
@@ -188,6 +196,7 @@ static void sched_PSJF() {
 /* Preemptive MLFQ scheduling algorithm */
 /* Graduate Students Only */
 static void sched_MLFQ() {
+    // TODO
     // YOUR CODE HERE
 
     // Your own implementation of MLFQ
@@ -206,6 +215,33 @@ int check_queue_is_empty() {
 }
 
 // YOUR CODE HERE
+
+int add_to_run_queue(int num, Node *node){
+    //	If there are no running threads in the given run queue, make the thread the beginning of the queue
+    if (num == 1) {
+        if (scheduler->round_robin_queue_T1 == NULL) {
+            addBack(scheduler->round_robin_queue_T1, node);
+            __sync_lock_release(&modifying_queue);
+            return 0;
+        }
+    }
+    if (num == 2) {
+        if (scheduler->round_robin_queue_T2 == NULL) {
+            addBack(scheduler->round_robin_queue_T2, node);
+            __sync_lock_release(&modifying_queue);
+            return 0;
+        }
+    }
+    if (num == 3) {
+        if (scheduler->round_robin_queue_T2 == NULL) {
+            addBack(scheduler->round_robin_queue_T2, node);
+            __sync_lock_release(&modifying_queue);
+            return 0;
+        }
+    }
+    return 0;
+}
+
 int age() {
     Node *ptr = scheduler->round_robin_queue_T1->head->next, *end = scheduler->round_robin_queue_T1->rear;
     while (ptr != end) {
@@ -265,6 +301,54 @@ int thread_handle(Node *ptr) {
                 finished_ptr->next = malloc(sizeof(exit_t_node));
                 finished_ptr->next->tid = exit_tid;
                 finished_ptr->next->next = NULL;
+            }
+            break;
+        }
+        case 2:
+        {
+            // printf("join() or mutex_lock() happened, handling ... \n");
+            // join and mutex_lock()
+            ptr->tcb->yield_purpose = 0;
+            break;
+        }
+        case 3:
+        {
+            // printf("yield() happened, handling ... \n");
+            //yield()
+            Node *first_node;
+            switch (scheduler->current_queue_number)
+            {
+                case 1:
+                    first_node = scheduler->round_robin_queue_T1->head->next;
+                    break;
+                case 2:
+                    first_node = scheduler->round_robin_queue_T2->head->next;
+                    break;
+                case 3:
+                    first_node = scheduler->round_robin_queue_T3->head->next;
+                    break;
+            }
+//            if (ptr->next != NULL)
+//            {
+//                first_node = ptr->next;
+//                first_node->next = ptr;
+//                ptr->next = ptr->next->next;
+//            }
+            ptr->tcb->yield_purpose = 0;
+        }
+        default: {
+            // printf("timeout happened, handling ... \n");
+            switch (scheduler->current_queue_number) {
+                case 1:
+                    ptr->tcb->priority = 50;
+                    add_to_run_queue(2, ptr);
+                    break;
+                case 2:
+                    ptr->tcb->priority = 1;
+                    add_to_run_queue(3, ptr);
+                    break;
+                default:
+                    break;
             }
             break;
         }
