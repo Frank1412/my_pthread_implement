@@ -36,6 +36,24 @@ int addBack(Queue *queue, Node *node){
     queue->size ++;
 }
 
+void removeNode(Queue *queue, Node *node){
+    Node *prev = node->prev, *next=node->next;
+    prev->next = next;
+    next->prev = prev;
+    node->next = NULL;
+    node->prev = NULL;
+    queue->size--;
+}
+
+void insertBefore(Queue* queue, Node *node, Node *pivot){
+    Node *prev = pivot->prev;
+    node->prev = prev;
+    node->next = pivot;
+    pivot->prev = node;
+    prev->next = node;
+    queue->size ++;
+}
+
 Node* removeFront(Queue *queue){
     Node* ret = queue->head->next;
     queue->head->next = ret->next;

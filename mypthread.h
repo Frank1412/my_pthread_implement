@@ -58,7 +58,7 @@ typedef struct thread_control_block {
      * 3 for yield()
      */
     int yield_purpose;  // 0 for timeout
-} my_pthread;
+} thread_control_block;
 
 typedef enum STATUS {
     Ready = 1, Running = 2, Wait = 3, Blocked = 4, Dead = 5
@@ -68,7 +68,7 @@ typedef enum STATUS {
 typedef struct mutex_waiting_queue_node {
 
     // YOUR CODE HERE
-    my_pthread *thread;
+    tcb *thread;
     uint mutex_lock;
     struct mutex_waiting_queue_node *next;
 } mutex_waiting_queue_node;
@@ -81,7 +81,7 @@ typedef struct my_pthread_mutex_t {
 };
 
 typedef struct join_waiting_queue_node {
-    my_pthread *thread;
+    tcb *thread;
     mypthread_t tid;
     void **value_pointer;
     struct join_waiting_queue_node *next;
@@ -103,15 +103,15 @@ typedef struct Scheduler {
     //	The second wait queue is for threads waiting to join another thread
     join_waiting_queue_node *join_waiting_queue;
     //  The list contains pid of all finished thread
-    Queue *exit_thread_list;
+    exit_t_node *exit_thread_list;
     // current thread in execution state
-    Node *current_thread; //  c d e f g a+1 b+0.5 c+0.1
+    Node *current_thread;
 } Scheduler;
 
 // global variables
 Scheduler *scheduler;
 struct itimerval timer;
-int scheduler_running;
+int scheduler_running; // binary semaphore
 int modifying_queue; // binary semaphore
 ucontext_t *return_function;
 my_pthread_t thread_number;
@@ -119,6 +119,12 @@ uint mutex_id;
 
 
 /* Function Declarations: */
+Node *get_current_thread();
+
+void add_to_run_queue_priority_based(Node *new_node);
+
+// swap thread context
+int swap_contexts();
 
 /* create a new thread */
 int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function)(void *), void *arg);
