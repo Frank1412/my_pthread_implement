@@ -865,6 +865,12 @@ int thread_handle(Node *ptr) {
 //                first_node->next = ptr;
 //                ptr->next = ptr->next->next;
 //            }
+            if(first_node!=NULL){
+                ptr->next = first_node->next;
+                ptr->prev = first_node;
+                ptr->next->prev = first_node;
+                first_node->next = ptr;
+            }
             ptr->tcb->yield_purpose = 0;
         }
         default: {
