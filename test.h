@@ -102,19 +102,19 @@ typedef struct join_waiting_queue_node {
 } join_waiting_queue_node;
 
 typedef struct Scheduler {
-    //	The first run queue is round robin with a time quantum of 25 ms
+    //	The first run queue for RR, SJF, MLFQ
     Queue *round_robin_queue_T1;
-    //	The second run queue is round robin with a time quantum of 50 ms
+    //	The second run queue for MLFQ
     Queue *round_robin_queue_T2;
-    // The fourth running queue is MLFQ
+    // The third running queue for MLFQ
     Queue *round_robin_queue_T3;
     //	Stores which queue is currently running
     int current_queue_number;
-    //	The first wait queue is for threads waiting for a mutex lock
+    //	the mutex wait queue is for threads waiting for a mutex lock
     mutex_waiting_queue_node *mutex_waiting_queue;
     //	The join wait queue is for threads waiting to join another thread
     join_waiting_queue_node *join_waiting_queue;
-    //  The list contains pid of all finished thread to exit
+    //  The list contains pid of all exited thread
     exit_t_node *exit_thread_list;
     // current thread in execution state
     Node *current_thread;
