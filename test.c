@@ -392,9 +392,9 @@ static void sched_RR() {
         __sync_lock_release(&modifying_queue);
         setcontext(scheduler->round_robin_queue_T1->head->next->tcb->context);
     }
+    scheduler->current_thread=current_running_queue->head->next;
     __sync_lock_release(&scheduler_running);
     __sync_lock_release(&modifying_queue);
-    scheduler->current_thread=current_running_queue->head->next;
     swapcontext(ptr->tcb->context, current_running_queue->head->next->tcb->context);
     // Your own implementation of RR
     // (feel free to modify arguments and return types)
@@ -482,9 +482,9 @@ static void sched_PSJF() {
         __sync_lock_release(&modifying_queue);
         setcontext(scheduler->round_robin_queue_T1->head->next->tcb->context);
     }
+    scheduler->current_thread=current_running_queue->head->next;
     __sync_lock_release(&scheduler_running);
     __sync_lock_release(&modifying_queue);
-    scheduler->current_thread=current_running_queue->head->next;
     swapcontext(ptr->tcb->context, current_running_queue->head->next->tcb->context);
     // Your own implementation of PSJF (STCF)
     // (feel free to modify arguments and return types)
@@ -652,11 +652,11 @@ static void sched_MLFQ() {
                 __sync_lock_release(&modifying_queue);
                 setcontext(scheduler->round_robin_queue_T1->head->next->tcb->context);
             }
+            scheduler->current_thread = scheduler->round_robin_queue_T1->head->next;
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
-            scheduler->current_thread = scheduler->round_robin_queue_T1->head->next;
-//            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
-            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
+            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
+//            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
             break;
             //		If the second queue has the highest priority thread, switch to that one.
         case 2:
@@ -681,9 +681,9 @@ static void sched_MLFQ() {
                 __sync_lock_release(&modifying_queue);
                 setcontext(scheduler->round_robin_queue_T2->head->next->tcb->context);
             }
+            scheduler->current_thread = scheduler->round_robin_queue_T2->head->next;
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
-            scheduler->current_thread = scheduler->round_robin_queue_T2->head->next;
             swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T2->head->next->tcb->context);
             break;
             //		If the third queue has the highest priority thread, switch to that one.
@@ -709,9 +709,9 @@ static void sched_MLFQ() {
                 __sync_lock_release(&modifying_queue);
                 setcontext(scheduler->round_robin_queue_T3->head->next->tcb->context);
             }
+            scheduler->current_thread = scheduler->round_robin_queue_T3->head->next;
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
-            scheduler->current_thread = scheduler->round_robin_queue_T3->head->next;
             swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T3->head->next->tcb->context);
             break;
         default:
@@ -954,11 +954,18 @@ int swap_context() {
 
 Node *get_current_thread() {
     if (QUEUE_NUMBER==3){
-        if (scheduler->round_robin_queue_T1->size!=0){
+//        if (scheduler->round_robin_queue_T1->size!=0){
+//            return scheduler->round_robin_queue_T1->head->next;
+//        } else if (scheduler->round_robin_queue_T2->size!=0){
+//            return scheduler->round_robin_queue_T2->head->next;
+//        } else{
+//            return scheduler->round_robin_queue_T3->head->next;
+//        }
+        if (scheduler->current_queue_number==1){
             return scheduler->round_robin_queue_T1->head->next;
-        } else if (scheduler->round_robin_queue_T2->size!=0){
+        } else if (scheduler->current_queue_number==2){
             return scheduler->round_robin_queue_T2->head->next;
-        } else{
+        } else if (scheduler->current_queue_number==3){
             return scheduler->round_robin_queue_T3->head->next;
         }
     }
