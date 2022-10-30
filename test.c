@@ -17,22 +17,33 @@ int modifying_queue; // binary semaphore
 ucontext_t *return_function;
 mypthread_t thread_number;
 uint mutex_id;
-int TIMER_PARA=2500;
-int QUEUE_NUMBER=1;
+int TIMER_PARA=250000;
+int QUEUE_NUMBER=2;
+
+
+
+//
+//void print_alart(int a){
+//    i++;
+//    printf("ALARM!!!");
+//    return;
+//}
 
 /* create a new thread */
 int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function)(void *), void *arg) {
     // YOUR CODE HERE
+//    while (__sync_lock_test_and_set(&modifying_queue, 1) == 1);
     if (scheduler == NULL) {
         printf("scheduler is NULL");
         thread_number = 0;
         // create a Thread Control Block
         scheduler = initial_scheduler();
         // create and initialize the context of this thread
-        Node *newNode = create_thread_node();
+        Node *main_thread = create_thread_node();
+        scheduler->current_thread=main_thread;
         while (__sync_lock_test_and_set(&modifying_queue, 1) == 1);
-        add_to_run_queue(1,newNode);
-        __sync_lock_release(&modifying_queue);
+        add_to_run_queue(1,main_thread);
+//        __sync_lock_release(&modifying_queue);
 
 
         return_function = malloc(sizeof(ucontext_t));
@@ -48,15 +59,22 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
     }
     // set a timer to 25ms
     if (timer.it_interval.tv_usec == 0) {
+        printf("timer ininininin \n");
         signal(SIGVTALRM, (void (*)(int)) &swap_context);
-        getitimer(ITIMER_VIRTUAL, &timer);
+//        getitimer(ITIMER_VIRTUAL, &timer);
         timer.it_value.tv_sec = 0;
         timer.it_value.tv_usec = TIMER_PARA;
         timer.it_interval.tv_sec = 0;
         timer.it_interval.tv_usec = TIMER_PARA;
+//        signal(SIGVTALRM,print_alart);
+//        timer.it_value.tv_sec = 0;
+//        timer.it_value.tv_usec = 1;
+//        timer.it_interval.tv_sec = 0;
+//        timer.it_interval.tv_usec = 1;
         setitimer(ITIMER_VIRTUAL, &timer, NULL);
+
     }
-    // initialize a new thread
+//     initialize a new thread
     Node *new_thread = malloc(sizeof(Node));
     new_thread->tcb = malloc(sizeof(thread_control_block));
     new_thread->tcb->context = malloc(sizeof(ucontext_t));
@@ -179,6 +197,7 @@ int mypthread_join(mypthread_t thread, void **value_ptr) {
     new_node->next = NULL;
     // printf("Setting value ptr\n");
     new_node->value_pointer = value_ptr;
+
     // printf("Finished making new node\n");
     // add to wait queue
     if (scheduler->join_waiting_queue == NULL) {
@@ -332,12 +351,91 @@ static void sched_RR() {
 //    Node *ptr=scheduler->round_robin_queue_T1->head->next;
     Queue *current_running_queue=scheduler->round_robin_queue_T1;
     Node *ptr= removeFront(current_running_queue);
-    age();
-    thread_handle(ptr);
+//    age();
+//    thread_handle(ptr);
+//    addBack(current_running_queue, ptr);
+    yield_handler_RR(ptr);
+    scheduler->current_queue_number=1;
+    getitimer(ITIMER_VIRTUAL, &timer);
+    timer.it_interval.tv_usec=TIMER_PARA;
+    timer.it_interval.tv_usec=TIMER_PARA;
+    setitimer(ITIMER_VIRTUAL, &timer, NULL);
+    if (ptr->tcb->tid==scheduler->round_robin_queue_T1->head->next->tcb->tid){
+        // this is the only thread
+        __sync_lock_release(&scheduler_running);
+        __sync_lock_release(&modifying_queue);
+        return;
+    }
+    if (ptr->tcb->yield_purpose==1 && ptr->tcb->tid!=0){
+        free(ptr->tcb->context->uc_stack.ss_sp);
+        free(ptr->tcb->context);
+        free(ptr->tcb);
+        free(ptr);
+        __sync_lock_release(&scheduler_running);
+        __sync_lock_release(&modifying_queue);
+        setcontext(scheduler->round_robin_queue_T1->head->next->tcb->context);
+    }
+    __sync_lock_release(&scheduler_running);
+    __sync_lock_release(&modifying_queue);
+    scheduler->current_thread=current_running_queue->head->next;
+    swapcontext(ptr->tcb->context, current_running_queue->head->next->tcb->context);
     // Your own implementation of RR
     // (feel free to modify arguments and return types)
-
     return;
+}
+
+int yield_handler_RR(Node *ptr){
+    switch (ptr->tcb->yield_purpose) {
+        case 1: {
+            mypthread_t exit_tid=ptr->tcb->tid;
+            join_waiting_queue_node *wait_prev=NULL;
+            join_waiting_queue_node *wait_ptr=scheduler->join_waiting_queue;
+            while (wait_ptr!=NULL){
+                if (wait_ptr->tid==exit_tid){// move father thread back to T1 queue
+                    Node *new_node= malloc(sizeof(Node));
+                    new_node->next=NULL;
+                    new_node->prev=NULL;
+                    new_node->tcb=wait_ptr->tcb;
+                    add_to_run_queue(1, new_node);
+                    if (wait_prev==NULL){
+                        scheduler->join_waiting_queue=wait_ptr->next;
+                    } else{
+                        wait_prev->next=wait_ptr->next;
+                    }
+                    join_waiting_queue_node *tmp=wait_ptr;
+                    wait_ptr=wait_ptr->next;
+                    free(tmp);
+                } else{
+                    wait_prev=wait_ptr;
+                    wait_ptr=wait_ptr->next;
+                }
+
+            }
+            // move exit node to exit node list
+            exit_t_node *exit_node=scheduler->exit_thread_list;
+            if (exit_node==NULL){
+                scheduler->exit_thread_list= malloc(sizeof(exit_t_node));
+                scheduler->exit_thread_list->tid=exit_tid;
+                scheduler->exit_thread_list->next=NULL;
+            } else{
+                while (exit_node->next!=NULL){
+                    exit_node=exit_node->next;
+                }
+                exit_node->next= malloc(sizeof(exit_t_node));
+                exit_node->next->tid=exit_tid;
+                exit_node->next->next=NULL;
+            }
+            break;
+        }
+        case 2:{
+            ptr->tcb->yield_purpose=0;
+            break;
+        }
+        default:{
+            ptr->tcb->yield_purpose=0;
+            addBack(scheduler->round_robin_queue_T1, ptr);
+        }
+    }
 }
 
 /* Preemptive PSJF (STCF) scheduling algorithm */
@@ -346,16 +444,133 @@ static void sched_PSJF() {
     Queue *current_running_queue=scheduler->round_robin_queue_T1;
     Node *ptr=get_most_waiting_time_node(current_running_queue);
     removeNode(current_running_queue, ptr);
-    ptr->tcb->waiting_time=0;
+//    ptr->tcb->waiting_time=0;
     add_waiting_time();
-    age();
-    thread_handle(ptr);
+//    age();
+//    thread_handle(ptr);
+    yield_handler_PSJF(ptr);
+    scheduler->current_queue_number=1;
+    getitimer(ITIMER_VIRTUAL, &timer);
+    timer.it_interval.tv_usec=TIMER_PARA;
+    timer.it_interval.tv_usec=TIMER_PARA;
+    setitimer(ITIMER_VIRTUAL, &timer, NULL);
+    if (ptr->tcb->tid==scheduler->round_robin_queue_T1->head->next->tcb->tid){
+        // this is the only thread
+        __sync_lock_release(&scheduler_running);
+        __sync_lock_release(&modifying_queue);
+        return;
+    }
+    if (ptr->tcb->yield_purpose==1 && ptr->tcb->tid!=0){
+        free(ptr->tcb->context->uc_stack.ss_sp);
+        free(ptr->tcb->context);
+        free(ptr->tcb);
+        free(ptr);
+        __sync_lock_release(&scheduler_running);
+        __sync_lock_release(&modifying_queue);
+        setcontext(scheduler->round_robin_queue_T1->head->next->tcb->context);
+    }
+    __sync_lock_release(&scheduler_running);
+    __sync_lock_release(&modifying_queue);
+    scheduler->current_thread=current_running_queue->head->next;
+    swapcontext(ptr->tcb->context, current_running_queue->head->next->tcb->context);
     // Your own implementation of PSJF (STCF)
     // (feel free to modify arguments and return types)
-
     return;
 }
 
+int yield_handler_PSJF(Node *ptr){
+    switch (ptr->tcb->yield_purpose) {
+        case 1: {
+            mypthread_t exit_tid=ptr->tcb->tid;
+            join_waiting_queue_node *wait_prev=NULL;
+            join_waiting_queue_node *wait_ptr=scheduler->join_waiting_queue;
+            while (wait_ptr!=NULL){
+                if (wait_ptr->tid==exit_tid){// move father thread back to T1 queue
+                    Node *new_node= malloc(sizeof(Node));
+                    new_node->next=NULL;
+                    new_node->prev=NULL;
+                    new_node->tcb=wait_ptr->tcb;
+                    new_node->tcb->waiting_time=wait_ptr->waiting_time;
+                    add_to_run_queue_waiting_time_based(1, new_node);
+                    if (wait_prev==NULL){
+                        scheduler->join_waiting_queue=wait_ptr->next;
+                        wait_prev=NULL;
+                    } else{
+                        wait_prev->next=wait_ptr->next;
+                    }
+                    join_waiting_queue_node *tmp=wait_ptr;
+                    wait_ptr=wait_ptr->next;
+                    free(tmp);
+                }else{
+                    wait_prev=wait_ptr;
+                    wait_ptr=wait_ptr->next;
+                }
+
+            }
+            // move exit node to exit node list
+            exit_t_node *exit_node=scheduler->exit_thread_list;
+            if (exit_node==NULL){
+                scheduler->exit_thread_list= malloc(sizeof(exit_t_node));
+                scheduler->exit_thread_list->tid=exit_tid;
+                scheduler->exit_thread_list->next=NULL;
+            } else{
+                while (exit_node->next!=NULL){
+                    exit_node=exit_node->next;
+                }
+                exit_node->next= malloc(sizeof(exit_t_node));
+                exit_node->next->tid=exit_tid;
+                exit_node->next->next=NULL;
+            }
+            break;
+        }
+        case 2:{
+            ptr->tcb->yield_purpose=0;
+            break;
+        }
+        default:{
+            ptr->tcb->yield_purpose=0;
+            add_to_run_queue_waiting_time_based(1, ptr);
+        }
+    }
+}
+
+int add_to_run_queue_waiting_time_based(int queue_number, Node *new_node){
+    Queue *current_queue;
+    switch (queue_number) {
+        case 1:{
+            current_queue=scheduler->round_robin_queue_T1;
+            break;
+        }
+        case 2:{
+            current_queue=scheduler->round_robin_queue_T2;
+            break;
+        }
+        case 3:{
+            current_queue=scheduler->round_robin_queue_T3;
+            break;
+        }default:{
+            current_queue=scheduler->round_robin_queue_T1;
+        }
+    }
+    Node *ptr=current_queue->head->next;
+    while (ptr!=current_queue->rear){
+        if (new_node->tcb->waiting_time>ptr->tcb->waiting_time){
+            new_node->next=ptr->next;
+            new_node->prev=ptr->prev;
+            ptr->prev->next=new_node;
+            ptr->prev=new_node;
+            break;
+        }
+        ptr=ptr->next;
+    }
+    if (ptr==current_queue->rear){
+        new_node->next=ptr;
+        new_node->prev=ptr->prev;
+        ptr->prev->next=new_node;
+        ptr->prev=new_node;
+    }
+    return 0;
+}
 
 /* Preemptive MLFQ scheduling algorithm */
 /* Graduate Students Only */
@@ -694,6 +909,7 @@ int get_highest_priority() {
 }
 
 int swap_context() {
+    printf("This is swap context!!!!!! \n");
     //If there are no running threads, then just exit
     if (check_queue_is_empty() == 1) {
         return 0;
@@ -713,7 +929,8 @@ int swap_context() {
         return 0;
     }
     schedule();
-
+    __sync_lock_release(&scheduler_running);
+    __sync_lock_release(&modifying_queue);
 
     return 0;
 }
@@ -774,25 +991,27 @@ int add_to_mutex_waiting_queue(mutex_waiting_queue_node *node) {
 }
 
 Node *get_most_waiting_time_node(Queue *queue){
-    Node *most_waiting_time_node;
-    int most_waiting_time=0;
-    Node *ptr=queue->head->next;
-    while (ptr->next!=NULL){
-        if (most_waiting_time<ptr->tcb->waiting_time){
-            most_waiting_time=ptr->tcb->waiting_time;
-            most_waiting_time_node=ptr;
-        }
-        ptr=ptr->next;
-    }
-    return most_waiting_time_node;
+//    Node *most_waiting_time_node;
+//    int most_waiting_time=0;
+//    Node *ptr=queue->head->next;
+//    while (ptr->next!=NULL){
+//        if (most_waiting_time<ptr->tcb->waiting_time){
+//            most_waiting_time=ptr->tcb->waiting_time;
+//            most_waiting_time_node=ptr;
+//        }
+//        ptr=ptr->next;
+//    }
+//    return most_waiting_time_node;
+    return queue->head->next;
 }
 
 void add_waiting_time(){
     int iteration_time=timer.it_interval.tv_usec;
     Queue *current_running_queue=scheduler->round_robin_queue_T1;
     Node *ptr=current_running_queue->head->next;
-    while (ptr->next!=NULL){
+    while (ptr!=current_running_queue->rear){
         ptr->tcb->waiting_time+=iteration_time;
+        ptr=ptr->next;
     }
     return;
 }

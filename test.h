@@ -100,6 +100,7 @@ typedef struct join_waiting_queue_node {
     mypthread_t tid;
     void **value_pointer;
     struct join_waiting_queue_node *next;
+    double waiting_time;
 } join_waiting_queue_node;
 
 // Feel free to add your own auxiliary data structures (linked list or queue etc...)
@@ -210,6 +211,12 @@ void insertBefore(Queue* queue, Node *node, Node *pivot);
 Node* removeFront(Queue *queue);
 
 Node* removeBack(Queue *queue);
+
+int yield_handler_RR(Node *ptr);
+
+int yield_handler_PSJF(Node *ptr);
+
+int add_to_run_queue_waiting_time_based(int queue_number, Node *new_node);
 
 
 
