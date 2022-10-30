@@ -38,31 +38,34 @@ typedef struct Queue {
 
 
 typedef struct exit_t_node {
-    mypthread_t tid;
-    struct exit_t_node *next;
+    mypthread_t tid;    // thread ID
+    struct exit_t_node *next;   // points to next thread
 } exit_t_node;
 
 /* add important states in a thread control block */
 typedef struct thread_control_block {
 
-    // YOUR CODE HERE
     // thread Id
     int tid;
+
     // thread status
     int status;
+
     // thread context
-    ucontext_t *context;
-    // thread stack  (uc_stack in ucontext_t)
+    ucontext_t *context; // contains thread stack
 
     // thread priority  0-10
     int priority;
-    // And more ...
+
     // waiting time
     double waiting_time;
+
     // quantum count
     int quantum_count;
+
     // execution time:
     double execution_time;
+
     // return value from thread(maybe!!!)
     void *ret_val;
 
@@ -72,20 +75,14 @@ typedef struct thread_control_block {
      * 2 for join() and mutex_lock()
      * 3 for yield()
      */
-    int yield_purpose;  // 0 for timeout
+    int yield_purpose;
 } thread_control_block;
-
-typedef enum STATUS {
-    Ready = 1, Running = 2, Wait = 3, Blocked = 4, Dead = 5
-} STATUS;
 
 /* mutex struct definition */
 typedef struct mutex_waiting_queue_node {
-
-    // YOUR CODE HERE
     thread_control_block *thread;
     uint mutex_lock;
-    struct mutex_waiting_queue_node *next;
+    struct mutex_waiting_queue_node *next;  // points to next mutex waiting thread
 } mutex_waiting_queue_node;
 
 typedef struct my_pthread_mutex_t {
@@ -93,8 +90,9 @@ typedef struct my_pthread_mutex_t {
     mypthread_t tid;
     int mutex_lock;
     uint mid;
-}mypthread_mutex_t;
+} mypthread_mutex_t;
 
+/* thread join waiting queue */
 typedef struct join_waiting_queue_node {
     thread_control_block *tcb;
     mypthread_t tid;
@@ -103,7 +101,6 @@ typedef struct join_waiting_queue_node {
     double waiting_time;
 } join_waiting_queue_node;
 
-// Feel free to add your own auxiliary data structures (linked list or queue etc...)
 typedef struct Scheduler {
     //	The first run queue is round robin with a time quantum of 25 ms
     Queue *round_robin_queue_T1;
@@ -115,10 +112,9 @@ typedef struct Scheduler {
     int current_queue_number;
     //	The first wait queue is for threads waiting for a mutex lock
     mutex_waiting_queue_node *mutex_waiting_queue;
-
-    //	The second wait queue is for threads waiting to join another thread
+    //	The join wait queue is for threads waiting to join another thread
     join_waiting_queue_node *join_waiting_queue;
-    //  The list contains pid of all finished thread
+    //  The list contains pid of all finished thread to exit
     exit_t_node *exit_thread_list;
     // current thread in execution state
     Node *current_thread;
@@ -137,10 +133,14 @@ typedef struct Scheduler {
 
 
 /* Function Declarations: */
+
+// get current thread
 Node *get_current_thread();
 
+// get queue number with the highest level and non-empty
 int get_highest_priority();
 
+// add new_node to first queue in a proper place
 void add_to_run_queue_priority_based(Node *new_node);
 
 // swap thread context
@@ -170,56 +170,74 @@ int mypthread_mutex_unlock(mypthread_mutex_t *mutex);
 /* destroy a mutex */
 int mypthread_mutex_destroy(mypthread_mutex_t *mutex);
 
+// initialize a scheduler
 Scheduler *initial_scheduler();
 
+// create a thread Node
 Node *create_thread_node();
 
+// MLFQ handle thread node ptr
 int thread_handle(Node *ptr);
 
+// increase priority by 1
 int age();
 
-//int add_node_into_queue(int schedulerStyle, Node *threadNode);
+// add thread to mutex waiting queue
+int add_to_mutex_waiting_queue(mutex_waiting_queue_node *node);
 
-int add_to_mutex_waiting_queue(mutex_waiting_queue_node* node);
-
+// scheduling by round-robin
 static void sched_RR();
 
+// scheduling by shortest job first
 static void sched_PSJF();
 
+// scheduling by multi-level feedback queue
 static void sched_MLFQ();
 
+// get the thrr=ead node with the largest waiting time
 Node *get_most_waiting_time_node(Queue *queue);
 
+// add waiting time to all thread
 void add_waiting_time();
 
+// add node to specific queue number
 int add_to_run_queue(int num, Node *node);
 
-
-
+// initialize a empty queue
 Queue *initQueue();
 
+// check whether queue is empty
 int isEmpty(Queue *queue);
 
+// add node to the head of the queue
 void addFront(Queue *queue, Node *node);
 
+// add node from the rear of the queue
 int addBack(Queue *queue, Node *node);
 
+// remove the node from queue
 void removeNode(Queue *queue, Node *node);
 
-void insertBefore(Queue* queue, Node *node, Node *pivot);
+// insert node into queue before pivot
+void insertBefore(Queue *queue, Node *node, Node *pivot);
 
-Node* removeFront(Queue *queue);
+// remove the first node from queue
+Node *removeFront(Queue *queue);
 
-Node* removeBack(Queue *queue);
+// remove the last node from queue
+Node *removeBack(Queue *queue);
 
+// handle Node ptr when round-robin
 int yield_handler_RR(Node *ptr);
 
+// handle Node ptr when SJF
 int yield_handler_PSJF(Node *ptr);
 
+// insert new_node into current_queue ib a proper place base on waiting time
 int add_to_run_queue_waiting_time_based(Queue *current_queue, Node *new_node);
 
+// test function
 void print_queue_tid();
-
 
 
 #ifdef USE_MYTHREAD
@@ -233,7 +251,6 @@ void print_queue_tid();
 #define pthread_mutex_unlock mypthread_mutex_unlock
 #define pthread_mutex_destroy mypthread_mutex_destroy
 #endif
-
 
 
 #endif
