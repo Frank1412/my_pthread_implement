@@ -18,7 +18,7 @@ ucontext_t *return_function;
 mypthread_t thread_number;
 uint mutex_id;
 int TIMER_PARA=2500;
-int QUEUE_NUMBER=3;
+int QUEUE_NUMBER=1;
 
 
 
@@ -172,7 +172,7 @@ void mypthread_exit(void *value_ptr) {
 /* Wait for thread termination */
 int mypthread_join(mypthread_t thread, void **value_ptr) {
     // YOUR CODE HERE
-     printf("\n%d Joining\n", get_current_thread()->tcb->tid);
+     printf("\n%d Joining by %d\n", get_current_thread()->tcb->tid, thread);
     // lock queue
 //    if (__sync_lock_test_and_set(&modifying_queue, 1) == 1)
 //    {
@@ -257,6 +257,7 @@ int mypthread_mutex_lock(mypthread_mutex_t *mutex) {
     mutex_waiting_queue_node *wait_node = malloc(sizeof(mutex_waiting_queue_node));
     Node *current_thread = get_current_thread();
     wait_node->thread = current_thread->tcb;
+    printf("%d wait for %d\n", current_thread->tcb->tid, mutex->tid);
     current_thread->tcb->yield_purpose = 2;
     wait_node->mutex_lock = mutex->mid;
     wait_node->next = NULL;
@@ -301,7 +302,7 @@ int mypthread_mutex_unlock(mypthread_mutex_t *mutex) {
                         break;
                     }
                     case 2:{
-                        add_to_run_queue_waiting_time_based(1, node);
+                        add_to_run_queue_waiting_time_based(scheduler->round_robin_queue_T1, node);
                         break;
                     }
                     case 3:{
@@ -392,9 +393,9 @@ static void sched_RR() {
         __sync_lock_release(&modifying_queue);
         setcontext(scheduler->round_robin_queue_T1->head->next->tcb->context);
     }
-    scheduler->current_thread=current_running_queue->head->next;
     __sync_lock_release(&scheduler_running);
     __sync_lock_release(&modifying_queue);
+    scheduler->current_thread=current_running_queue->head->next;
     swapcontext(ptr->tcb->context, current_running_queue->head->next->tcb->context);
     // Your own implementation of RR
     // (feel free to modify arguments and return types)
@@ -413,16 +414,23 @@ int yield_handler_RR(Node *ptr){
                     new_node->next=NULL;
                     new_node->prev=NULL;
                     new_node->tcb=wait_ptr->tcb;
+                    printf("thread %d comes back", new_node->tcb->tid);
                     add_to_run_queue(1, new_node);
                     if (wait_prev==NULL){
                         scheduler->join_waiting_queue=wait_ptr->next;
                     } else{
                         wait_prev->next=wait_ptr->next;
                     }
+                    join_waiting_queue_node *tmp=wait_ptr;
+                    wait_ptr=wait_ptr->next;
+                    if (tmp->tid<=thread_number){
+                        free(tmp);
+                    }
+                } else{
+                    wait_prev=wait_ptr;
+                    wait_ptr=wait_ptr->next;
                 }
-                join_waiting_queue_node *tmp=wait_ptr;
-                wait_ptr=wait_ptr->next;
-                free(tmp);
+
             }
             // move exit node to exit node list
             exit_t_node *exit_node=scheduler->exit_thread_list;
@@ -455,8 +463,8 @@ int yield_handler_RR(Node *ptr){
 static void sched_PSJF() {
     // YOUR CODE HERE
     Queue *current_running_queue=scheduler->round_robin_queue_T1;
-    Node *ptr=get_most_waiting_time_node(current_running_queue);
-    removeNode(current_running_queue, ptr);
+    Node *ptr=removeFront(current_running_queue);
+//    removeNode(current_running_queue, ptr);
 //    ptr->tcb->waiting_time=0;
     add_waiting_time();
 //    age();
@@ -482,9 +490,9 @@ static void sched_PSJF() {
         __sync_lock_release(&modifying_queue);
         setcontext(scheduler->round_robin_queue_T1->head->next->tcb->context);
     }
-    scheduler->current_thread=current_running_queue->head->next;
     __sync_lock_release(&scheduler_running);
     __sync_lock_release(&modifying_queue);
+    scheduler->current_thread=current_running_queue->head->next;
     swapcontext(ptr->tcb->context, current_running_queue->head->next->tcb->context);
     // Your own implementation of PSJF (STCF)
     // (feel free to modify arguments and return types)
@@ -504,7 +512,8 @@ int yield_handler_PSJF(Node *ptr){
                     new_node->prev=NULL;
                     new_node->tcb=wait_ptr->tcb;
                     new_node->tcb->waiting_time=wait_ptr->waiting_time;
-                    add_to_run_queue_waiting_time_based(1, new_node);
+                    printf("thread %d comes back", new_node->tcb->tid);
+                    add_to_run_queue_waiting_time_based(scheduler->round_robin_queue_T1, new_node);
                     if (wait_prev==NULL){
                         scheduler->join_waiting_queue=wait_ptr->next;
                         wait_prev=NULL;
@@ -513,7 +522,9 @@ int yield_handler_PSJF(Node *ptr){
                     }
                     join_waiting_queue_node *tmp=wait_ptr;
                     wait_ptr=wait_ptr->next;
-                    free(tmp);
+                    if(tmp->tid<=thread_number){
+                        free(tmp);
+                    }
                 }else{
                     wait_prev=wait_ptr;
                     wait_ptr=wait_ptr->next;
@@ -542,34 +553,17 @@ int yield_handler_PSJF(Node *ptr){
         }
         default:{
             ptr->tcb->yield_purpose=0;
-            add_to_run_queue_waiting_time_based(1, ptr);
+            add_to_run_queue_waiting_time_based(scheduler->round_robin_queue_T1, ptr);
         }
     }
 }
 
-int add_to_run_queue_waiting_time_based(int queue_number, Node *new_node){
-    Queue *current_queue;
-    switch (queue_number) {
-        case 1:{
-            current_queue=scheduler->round_robin_queue_T1;
-            break;
-        }
-        case 2:{
-            current_queue=scheduler->round_robin_queue_T2;
-            break;
-        }
-        case 3:{
-            current_queue=scheduler->round_robin_queue_T3;
-            break;
-        }default:{
-            current_queue=scheduler->round_robin_queue_T1;
-        }
-    }
+int add_to_run_queue_waiting_time_based(Queue *current_queue, Node *new_node){
     Node *ptr=current_queue->head->next;
     while (ptr!=current_queue->rear){
         if (new_node->tcb->waiting_time>ptr->tcb->waiting_time){
-            new_node->next=ptr->next;
             new_node->prev=ptr->prev;
+            new_node->next=ptr;
             ptr->prev->next=new_node;
             ptr->prev=new_node;
             break;
@@ -582,6 +576,7 @@ int add_to_run_queue_waiting_time_based(int queue_number, Node *new_node){
         ptr->prev->next=new_node;
         ptr->prev=new_node;
     }
+    current_queue->size++;
     return 0;
 }
 
@@ -653,10 +648,11 @@ static void sched_MLFQ() {
                 setcontext(scheduler->round_robin_queue_T1->head->next->tcb->context);
             }
             scheduler->current_thread = scheduler->round_robin_queue_T1->head->next;
+            scheduler->current_queue_number=1;
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
-            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
-//            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
+//            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
+            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
             break;
             //		If the second queue has the highest priority thread, switch to that one.
         case 2:
@@ -682,9 +678,11 @@ static void sched_MLFQ() {
                 setcontext(scheduler->round_robin_queue_T2->head->next->tcb->context);
             }
             scheduler->current_thread = scheduler->round_robin_queue_T2->head->next;
+            scheduler->current_queue_number=2;
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
-            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T2->head->next->tcb->context);
+//            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T2->head->next->tcb->context);
+            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T2->head->next->tcb->context);
             break;
             //		If the third queue has the highest priority thread, switch to that one.
         case 3:
@@ -709,10 +707,14 @@ static void sched_MLFQ() {
                 __sync_lock_release(&modifying_queue);
                 setcontext(scheduler->round_robin_queue_T3->head->next->tcb->context);
             }
-            scheduler->current_thread = scheduler->round_robin_queue_T3->head->next;
-            __sync_lock_release(&scheduler_running);
-            __sync_lock_release(&modifying_queue);
-            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T3->head->next->tcb->context);
+            if (scheduler->current_queue_number!=3){
+                scheduler->current_thread = scheduler->round_robin_queue_T3->head->next;
+                scheduler->current_queue_number=3;
+                __sync_lock_release(&scheduler_running);
+                __sync_lock_release(&modifying_queue);
+//            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T3->head->next->tcb->context);
+                swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T3->head->next->tcb->context);
+            }
             break;
         default:
             //		If none of the above, then something went wrong.
@@ -804,11 +806,21 @@ int thread_handle(Node *ptr) {
                     add_to_run_queue_priority_based(new_node);
                     printf("thread %d comes back", new_node->tcb->tid);
                     // remove node from wait queue
-                    scheduler->join_waiting_queue = wait_ptr->next;
+                    if (wait_ptr!=NULL){
+                        scheduler->join_waiting_queue = wait_ptr->next;
+                    } else{
+                        wait_prev->next=wait_ptr->next;
+                    }
+                    join_waiting_queue_node *tmp = wait_ptr;
+                    wait_ptr = wait_ptr->next;
+                    if (tmp->tid<=thread_number){
+                        free(tmp);
+                    }
+                } else{
+                    wait_prev=wait_ptr;
+                    wait_ptr=wait_ptr->next;
                 }
-                join_waiting_queue_node *tmp = wait_ptr;
-                wait_ptr = wait_ptr->next;
-                free(tmp);
+
             }
             // add pid to finished list
             exit_t_node *finished_ptr = scheduler->exit_thread_list;
@@ -875,18 +887,20 @@ int thread_handle(Node *ptr) {
 }
 
 void add_to_run_queue_priority_based(Node *node) {
-    Node *ptr = scheduler->round_robin_queue_T1->head->next, *end = scheduler->round_robin_queue_T1->rear;
-    //	Iterate through the first run queue until you reach the end or a thread with lower priority is found
-    while (ptr != end) {
-        if (ptr->tcb->priority < node->tcb->priority) {
-            //			If prev isn't next, insert the node between ptr and prev
-            insertBefore(scheduler->round_robin_queue_T1, node, ptr);
-            return;
-        }
-        ptr = ptr->next;
-    }
-    //	If no threads have lower priority, then the thread must be inserted at the end
-    insertBefore(scheduler->round_robin_queue_T1, node, end);
+//    Node *ptr = scheduler->round_robin_queue_T1->head->next, *end = scheduler->round_robin_queue_T1->rear;
+//    //	Iterate through the first run queue until you reach the end or a thread with lower priority is found
+//    while (ptr != end) {
+//        if (ptr->tcb->priority < node->tcb->priority) {
+//            //			If prev isn't next, insert the node between ptr and prev
+//            insertBefore(scheduler->round_robin_queue_T1, node, ptr);
+//            return;
+//        }
+//        ptr = ptr->next;
+//    }
+//    //	If no threads have lower priority, then the thread must be inserted at the end
+//    insertBefore(scheduler->round_robin_queue_T1, node, end);
+    node->tcb->priority=100;
+    add_to_run_queue(1, node);
 }
 
 int get_highest_priority() {
@@ -925,7 +939,8 @@ int get_highest_priority() {
 
 int swap_context() {
     printf("This is swap context!!!!!! \n");
-    print_queue_tid(scheduler->round_robin_queue_T1);
+    printf("current queue:%d\n", scheduler->current_queue_number);
+    print_queue_tid();
     printf("\n");
     //If there are no running threads, then just exit
     if (check_queue_is_empty() == 1) {
@@ -1035,7 +1050,10 @@ Node *get_most_waiting_time_node(Queue *queue){
 //        ptr=ptr->next;
 //    }
 //    return most_waiting_time_node;
-    return queue->head->next;
+    Node *ptr=queue->head->next;
+    queue->head->next=queue->head->next->next;
+    queue->size--;
+    return ptr;
 }
 
 void add_waiting_time(){
@@ -1124,6 +1142,7 @@ void print_queue_tid(){
     Queue *queue;
     Node *ptr;
     if (QUEUE_NUMBER==3){
+        printf("round_robin_queue_T1:");
         queue=scheduler->round_robin_queue_T1;
         ptr=queue->head->next;
         while (ptr!=queue->rear){
@@ -1131,6 +1150,7 @@ void print_queue_tid(){
             ptr=ptr->next;
         }
         printf("\n");
+        printf("round_robin_queue_T2:");
         queue=scheduler->round_robin_queue_T2;
         ptr=queue->head->next;
         while (ptr!=queue->rear){
@@ -1138,6 +1158,7 @@ void print_queue_tid(){
             ptr=ptr->next;
         }
         printf("\n");
+        printf("round_robin_queue_T3:");
         queue=scheduler->round_robin_queue_T3;
         ptr=queue->head->next;
         while (ptr!=queue->rear){
