@@ -218,6 +218,7 @@ int yield_handler_PSJF(Node *ptr);
 
 int add_to_run_queue_waiting_time_based(int queue_number, Node *new_node);
 
+void print_queue_tid();
 
 
 #ifdef USE_MYTHREAD

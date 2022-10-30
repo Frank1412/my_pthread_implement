@@ -17,8 +17,8 @@ int modifying_queue; // binary semaphore
 ucontext_t *return_function;
 mypthread_t thread_number;
 uint mutex_id;
-int TIMER_PARA=250000;
-int QUEUE_NUMBER=2;
+int TIMER_PARA=2500;
+int QUEUE_NUMBER=3;
 
 
 
@@ -113,6 +113,7 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
 
 /* current thread voluntarily surrenders its remaining runtime for other threads to use */
 int mypthread_yield() {
+    printf("thread %d yield", get_current_thread()->tcb->tid);
     // YOUR CODE HERE
     swap_context();
     return 0;
@@ -125,12 +126,13 @@ void mypthread_exit(void *value_ptr) {
 
     // preserve the return value pointer if not NULL
     // deallocate any dynamic memory allocated when starting this thread
-    // printf("\nthread %u exiting\n", get_current_thread()->thread->pid);
+     printf("\nthread %d exiting\n", get_current_thread()->tcb->tid);
     // lock queue
-    if (__sync_lock_test_and_set(&modifying_queue, 1) == 1) {
-        // printf("ERROR: queue locked when exiting\n");
-        return; // another thread locks the queue, should not happen
-    }
+//    if (__sync_lock_test_and_set(&modifying_queue, 1) == 1) {
+//        // printf("ERROR: queue locked when exiting\n");
+//        return; // another thread locks the queue, should not happen
+//    }
+    while (__sync_lock_test_and_set(&modifying_queue, 1)==1);
     // save return value to the threads waiting for this thread
     // printf("printing current tcb:");
     // read_queues();
@@ -170,13 +172,14 @@ void mypthread_exit(void *value_ptr) {
 /* Wait for thread termination */
 int mypthread_join(mypthread_t thread, void **value_ptr) {
     // YOUR CODE HERE
-    // printf("\nJoining\n");
+     printf("\n%d Joining\n", get_current_thread()->tcb->tid);
     // lock queue
-    if (__sync_lock_test_and_set(&modifying_queue, 1) == 1)
-    {
-        // printf("ERRIR: queue locked when joining\n");
-        return -1; // another thead locks the queue, should not happen
-    }
+//    if (__sync_lock_test_and_set(&modifying_queue, 1) == 1)
+//    {
+//        // printf("ERRIR: queue locked when joining\n");
+//        return -1; // another thead locks the queue, should not happen
+//    }
+    while (__sync_lock_test_and_set(&modifying_queue, 1)==1);
 
     // check if the thread has already fiinshed
     exit_t_node *p = scheduler->exit_thread_list;
@@ -292,7 +295,21 @@ int mypthread_mutex_unlock(mypthread_mutex_t *mutex) {
                 // add lock to modify queue
                 while (__sync_lock_test_and_set(&modifying_queue, 1) == 1);
                 // put the thread at the front of this mutex's blocked/waiting queue in to the run queue
-                add_to_run_queue_priority_based(node);
+                switch (QUEUE_NUMBER) {
+                    case 1:{
+                        add_to_run_queue(1, node);
+                        break;
+                    }
+                    case 2:{
+                        add_to_run_queue_waiting_time_based(1, node);
+                        break;
+                    }
+                    case 3:{
+                        add_to_run_queue_priority_based(node);
+                        break;
+                    }
+                }
+//                add_to_run_queue(1, node);
                 __sync_lock_release(&modifying_queue);
                 mutex_waiting_queue_node *tmp = ptr;
                 ptr = ptr->next;
@@ -314,7 +331,7 @@ int mypthread_mutex_destroy(mypthread_mutex_t *mutex) {
     // deallocate dynamic memory allocated during mypthread_mutex_init
     while (__sync_lock_test_and_set(&(mutex->mutex_lock), 1) == 1);
     mutex->initialized = 0;
-    free(mutex);
+//    free(mutex);
 
     return 0;
 };
@@ -402,14 +419,10 @@ int yield_handler_RR(Node *ptr){
                     } else{
                         wait_prev->next=wait_ptr->next;
                     }
-                    join_waiting_queue_node *tmp=wait_ptr;
-                    wait_ptr=wait_ptr->next;
-                    free(tmp);
-                } else{
-                    wait_prev=wait_ptr;
-                    wait_ptr=wait_ptr->next;
                 }
-
+                join_waiting_queue_node *tmp=wait_ptr;
+                wait_ptr=wait_ptr->next;
+                free(tmp);
             }
             // move exit node to exit node list
             exit_t_node *exit_node=scheduler->exit_thread_list;
@@ -642,7 +655,8 @@ static void sched_MLFQ() {
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
             scheduler->current_thread = scheduler->round_robin_queue_T1->head->next;
-            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
+//            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
+            swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
             break;
             //		If the second queue has the highest priority thread, switch to that one.
         case 2:
@@ -788,6 +802,7 @@ int thread_handle(Node *ptr) {
                     new_node->prev = NULL;
                     new_node->tcb = wait_ptr->tcb;
                     add_to_run_queue_priority_based(new_node);
+                    printf("thread %d comes back", new_node->tcb->tid);
                     // remove node from wait queue
                     scheduler->join_waiting_queue = wait_ptr->next;
                 }
@@ -885,19 +900,19 @@ int get_highest_priority() {
     int highest_priority = 0;
     int highest_priority_queue = 0;
     //	If the first queue isn't empty, then it is the highest so far
-    if (scheduler->round_robin_queue_T1 != NULL) {
+    if (scheduler->round_robin_queue_T1->size != 0) {
         highest_priority = scheduler->round_robin_queue_T1->head->next->tcb->priority;
         highest_priority_queue = 1;
     }
     //	Compare the priority of the first element in the second queue
-    if (scheduler->round_robin_queue_T2 != NULL) {
+    if (scheduler->round_robin_queue_T2->size != 0) {
         if (scheduler->round_robin_queue_T2->head->next->tcb->priority > highest_priority) {
             highest_priority = scheduler->round_robin_queue_T2->head->next->tcb->priority;
             highest_priority_queue = 2;
         }
     }
     //	Compare the priority of the first element in the third queue
-    if (scheduler->round_robin_queue_T3 != NULL) {
+    if (scheduler->round_robin_queue_T3->size != 0) {
         if (scheduler->round_robin_queue_T3->head->next->tcb->priority > highest_priority) {
             highest_priority = scheduler->round_robin_queue_T3->head->next->tcb->priority;
             highest_priority_queue = 3;
@@ -910,6 +925,8 @@ int get_highest_priority() {
 
 int swap_context() {
     printf("This is swap context!!!!!! \n");
+    print_queue_tid(scheduler->round_robin_queue_T1);
+    printf("\n");
     //If there are no running threads, then just exit
     if (check_queue_is_empty() == 1) {
         return 0;
@@ -936,7 +953,16 @@ int swap_context() {
 }
 
 Node *get_current_thread() {
-    return scheduler->current_thread;
+    if (QUEUE_NUMBER==3){
+        if (scheduler->round_robin_queue_T1->size!=0){
+            return scheduler->round_robin_queue_T1->head->next;
+        } else if (scheduler->round_robin_queue_T2->size!=0){
+            return scheduler->round_robin_queue_T2->head->next;
+        } else{
+            return scheduler->round_robin_queue_T3->head->next;
+        }
+    }
+    return scheduler->round_robin_queue_T1->head->next;
 }
 
 Scheduler *initial_scheduler() {
@@ -1085,4 +1111,39 @@ Node* removeBack(Queue *queue){
     ret->next = NULL;
     queue->size--;
     return ret;
+}
+
+void print_queue_tid(){
+    Queue *queue;
+    Node *ptr;
+    if (QUEUE_NUMBER==3){
+        queue=scheduler->round_robin_queue_T1;
+        ptr=queue->head->next;
+        while (ptr!=queue->rear){
+            printf("%d\t",ptr->tcb->tid);
+            ptr=ptr->next;
+        }
+        printf("\n");
+        queue=scheduler->round_robin_queue_T2;
+        ptr=queue->head->next;
+        while (ptr!=queue->rear){
+            printf("%d\t",ptr->tcb->tid);
+            ptr=ptr->next;
+        }
+        printf("\n");
+        queue=scheduler->round_robin_queue_T3;
+        ptr=queue->head->next;
+        while (ptr!=queue->rear){
+            printf("%d\t",ptr->tcb->tid);
+            ptr=ptr->next;
+        }
+        printf("\n");
+        return;
+    }
+    queue=scheduler->round_robin_queue_T1;
+    ptr=queue->head->next;
+    while (ptr!=queue->rear){
+        printf("%d\t",ptr->tcb->tid);
+        ptr=ptr->next;
+    }
 }
