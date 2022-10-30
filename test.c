@@ -113,8 +113,6 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
 
 /* current thread voluntarily surrenders its remaining runtime for other threads to use */
 int mypthread_yield() {
-//    printf("thread %d yield", get_current_thread()->tcb->tid);
-    // YOUR CODE HERE
     swap_context();
     return 0;
 };
@@ -122,48 +120,29 @@ int mypthread_yield() {
 
 /* terminate a thread */
 void mypthread_exit(void *value_ptr) {
-    // YOUR CODE HERE
-
     // preserve the return value pointer if not NULL
     // deallocate any dynamic memory allocated when starting this thread
      printf("\nthread %d exiting\n", get_current_thread()->tcb->tid);
     // lock queue
-//    if (__sync_lock_test_and_set(&modifying_queue, 1) == 1) {
-//        // printf("ERROR: queue locked when exiting\n");
-//        return; // another thread locks the queue, should not happen
-//    }
     while (__sync_lock_test_and_set(&modifying_queue, 1)==1);
-    // save return value to the threads waiting for this thread
-    // printf("printing current tcb:");
-    // read_queues();
+
+    // join_waiting_queue may be not empty
     if (scheduler->join_waiting_queue != NULL) {
-        // printf("Editing wait queue:\n");
         join_waiting_queue_node *wait_ptr = scheduler->join_waiting_queue;
-        join_waiting_queue_node *wait_prev = NULL;
-        /* if (wait_ptr->pid == current_pid) */
-        /* { */
-        /*     wait_ptr->ret_val_pos = value_ptr; */
-        /* } */
-        // printf("prev and ptr initialized, start iterating:\n");
         while (wait_ptr != NULL) {
             // printf("thread %d:\n", wait_ptr->thread->pid);
             if (wait_ptr->tid == get_current_thread()->tcb->tid) {
-                // printf("saving return value\n");
+                //save return value
                 if (wait_ptr->value_pointer != NULL) {
                     *(wait_ptr->value_pointer) = value_ptr;
                 }
-                // printf("return value saved\n");
             }
-            // printf("done\n");
-            wait_prev = wait_ptr;
             wait_ptr = wait_ptr->next;
         }
     }
-    // printf("Finished editing wait queue\n");
-    // set flag to indicate pthread exit
+    // set yield_purpose = 1, thread exit
     get_current_thread()->tcb->yield_purpose = 1;
     // unlock queue
-    // printf("exit() finished, going to yield()\n");
     __sync_lock_release(&modifying_queue);
     mypthread_yield();
 
@@ -339,7 +318,6 @@ int mypthread_mutex_destroy(mypthread_mutex_t *mutex) {
 
 /* scheduler */
 static void schedule() {
-    // YOUR CODE HERE
     switch (QUEUE_NUMBER){
         case 1:
             sched_RR();
@@ -583,7 +561,6 @@ int add_to_run_queue_waiting_time_based(Queue *current_queue, Node *new_node){
 /* Preemptive MLFQ scheduling algorithm */
 /* Graduate Students Only */
 static void sched_MLFQ() {
-    // read_queues();
     //	Depending on which run queue was running, change the priority of the current thread
 
     // printf("preparing to handle yield(), running queue is %d\nprinting current tcb:", scheduler->current_queue_number);
@@ -602,7 +579,7 @@ static void sched_MLFQ() {
             age();
             thread_handle(ptr);
             break;
-            //		If a thread in the third run queue was running, then it must be finished, because all threads there run to completion.
+            //		If a thread in the third running queue was running, do round-robin
         case 3:
             removeNode(scheduler->round_robin_queue_T3, ptr);
             age();
@@ -610,14 +587,13 @@ static void sched_MLFQ() {
             break;
             //		If none of the above, then something went wrong.
         default:
+            // unlock
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
             return ;
     }
     //	Depending on which queue has the highest first priority, switch the context to run that thread
 
-    // printf("done\nready to swapcontext()\nprint tcb:");
-    // read_queues();
     switch (get_highest_priority()) {
         //		If there are no more threads, then do nothing.
         case 0:
@@ -718,9 +694,6 @@ static void sched_MLFQ() {
             break;
         default:
             //		If none of the above, then something went wrong.
-            // free(ptr->thread->context);
-            // free(ptr->thread);
-            // free(ptr);
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
             return ;
@@ -728,7 +701,7 @@ static void sched_MLFQ() {
 
 }
 
-// Feel free to add any other functions you need
+// check whether there is a thread
 int check_queue_is_empty() {
     if (scheduler->round_robin_queue_T1 == NULL && scheduler->round_robin_queue_T2 == NULL &&
         scheduler->round_robin_queue_T3 == NULL) {
@@ -765,6 +738,7 @@ int add_to_run_queue(int num, Node *node) {
     return 0;
 }
 
+// increase priority by 1
 int age() {
     Node *ptr = scheduler->round_robin_queue_T1->head->next, *end = scheduler->round_robin_queue_T1->rear;
     while (ptr != end) {
@@ -942,19 +916,19 @@ int swap_context() {
 //    printf("current queue:%d\n", scheduler->current_queue_number);
 //    print_queue_tid();
 //    printf("\n");
-    //If there are no running threads, then just exit
+    //If no running threads, exit
     if (check_queue_is_empty() == 1) {
         return 0;
     }
     // printf("\nswap contexts\n");
-    //	If another function is modifying the queue, wait for it to finish before working
+    //	add queue lock
     if (__sync_lock_test_and_set(&modifying_queue, 1) == 1)
     {
         // printf("someone modifying the queue, return for now, come back soon\n");
         timer.it_interval.tv_usec = 1000;
         return 0;
     }
-    //	If the scheduler is already running, don't do anything
+    //	add scheduler lock
     if (__sync_lock_test_and_set(&scheduler_running, 1) == 1)
     {
         // printf("scheduler is running, return\n");
@@ -969,13 +943,6 @@ int swap_context() {
 
 Node *get_current_thread() {
     if (QUEUE_NUMBER==3){
-//        if (scheduler->round_robin_queue_T1->size!=0){
-//            return scheduler->round_robin_queue_T1->head->next;
-//        } else if (scheduler->round_robin_queue_T2->size!=0){
-//            return scheduler->round_robin_queue_T2->head->next;
-//        } else{
-//            return scheduler->round_robin_queue_T3->head->next;
-//        }
         if (scheduler->current_queue_number==1){
             return scheduler->round_robin_queue_T1->head->next;
         } else if (scheduler->current_queue_number==2){
@@ -1138,6 +1105,7 @@ Node* removeBack(Queue *queue){
     return ret;
 }
 
+//my test debug function
 void print_queue_tid(){
     Queue *queue;
     Node *ptr;
