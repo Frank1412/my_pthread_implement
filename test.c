@@ -34,7 +34,7 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
     // YOUR CODE HERE
 //    while (__sync_lock_test_and_set(&modifying_queue, 1) == 1);
     if (scheduler == NULL) {
-        printf("scheduler is NULL");
+//        printf("scheduler is NULL");
         thread_number = 0;
         // create a Thread Control Block
         scheduler = initial_scheduler();
@@ -59,7 +59,7 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
     }
     // set a timer to 25ms
     if (timer.it_interval.tv_usec == 0) {
-        printf("timer ininininin \n");
+//        printf("timer ininininin \n");
         signal(SIGVTALRM, (void (*)(int)) &swap_context);
 //        getitimer(ITIMER_VIRTUAL, &timer);
         timer.it_value.tv_sec = 0;
@@ -113,7 +113,7 @@ int mypthread_create(mypthread_t *thread, pthread_attr_t *attr, void *(*function
 
 /* current thread voluntarily surrenders its remaining runtime for other threads to use */
 int mypthread_yield() {
-    printf("thread %d yield", get_current_thread()->tcb->tid);
+//    printf("thread %d yield", get_current_thread()->tcb->tid);
     // YOUR CODE HERE
     swap_context();
     return 0;
@@ -172,7 +172,7 @@ void mypthread_exit(void *value_ptr) {
 /* Wait for thread termination */
 int mypthread_join(mypthread_t thread, void **value_ptr) {
     // YOUR CODE HERE
-     printf("\n%d Joining by %d\n", get_current_thread()->tcb->tid, thread);
+//     printf("\n%d Joining by %d\n", get_current_thread()->tcb->tid, thread);
     // lock queue
 //    if (__sync_lock_test_and_set(&modifying_queue, 1) == 1)
 //    {
@@ -257,7 +257,7 @@ int mypthread_mutex_lock(mypthread_mutex_t *mutex) {
     mutex_waiting_queue_node *wait_node = malloc(sizeof(mutex_waiting_queue_node));
     Node *current_thread = get_current_thread();
     wait_node->thread = current_thread->tcb;
-    printf("%d wait for %d\n", current_thread->tcb->tid, mutex->tid);
+//    printf("%d wait for %d\n", current_thread->tcb->tid, mutex->tid);
     current_thread->tcb->yield_purpose = 2;
     wait_node->mutex_lock = mutex->mid;
     wait_node->next = NULL;
@@ -414,7 +414,7 @@ int yield_handler_RR(Node *ptr){
                     new_node->next=NULL;
                     new_node->prev=NULL;
                     new_node->tcb=wait_ptr->tcb;
-                    printf("thread %d comes back", new_node->tcb->tid);
+//                    printf("thread %d comes back", new_node->tcb->tid);
                     add_to_run_queue(1, new_node);
                     if (wait_prev==NULL){
                         scheduler->join_waiting_queue=wait_ptr->next;
@@ -512,7 +512,7 @@ int yield_handler_PSJF(Node *ptr){
                     new_node->prev=NULL;
                     new_node->tcb=wait_ptr->tcb;
                     new_node->tcb->waiting_time=wait_ptr->waiting_time;
-                    printf("thread %d comes back", new_node->tcb->tid);
+//                    printf("thread %d comes back", new_node->tcb->tid);
                     add_to_run_queue_waiting_time_based(scheduler->round_robin_queue_T1, new_node);
                     if (wait_prev==NULL){
                         scheduler->join_waiting_queue=wait_ptr->next;
@@ -804,7 +804,7 @@ int thread_handle(Node *ptr) {
                     new_node->prev = NULL;
                     new_node->tcb = wait_ptr->tcb;
                     add_to_run_queue_priority_based(new_node);
-                    printf("thread %d comes back", new_node->tcb->tid);
+//                    printf("thread %d comes back", new_node->tcb->tid);
                     // remove node from wait queue
                     if (wait_ptr!=NULL){
                         scheduler->join_waiting_queue = wait_ptr->next;
@@ -938,10 +938,10 @@ int get_highest_priority() {
 }
 
 int swap_context() {
-    printf("This is swap context!!!!!! \n");
-    printf("current queue:%d\n", scheduler->current_queue_number);
-    print_queue_tid();
-    printf("\n");
+//    printf("This is swap context!!!!!! \n");
+//    printf("current queue:%d\n", scheduler->current_queue_number);
+//    print_queue_tid();
+//    printf("\n");
     //If there are no running threads, then just exit
     if (check_queue_is_empty() == 1) {
         return 0;
