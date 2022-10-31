@@ -567,41 +567,39 @@ static void sched_MLFQ() {
     // read_queues();
     Node *ptr = get_current_thread();
     switch (scheduler->current_queue_number) {
-        //		If a thread in the first run queue was running, age every other thread, then move it to the second run queue and set its priority to 50.
+        // move the thread in first queue to second queue
         case 1:
             removeNode(scheduler->round_robin_queue_T1, ptr);
             age();
             thread_handle(ptr);
             break;
-            //		If a thread in the second run queue was running, age every other thread, then move it to the third run queue and set its priority to 0.
-        case 2:
+
+        case 2: //  move the thread in second queue to third queue
             removeNode(scheduler->round_robin_queue_T2, ptr);
             age();
             thread_handle(ptr);
             break;
-            //		If a thread in the third running queue was running, do round-robin
-        case 3:
+        case 3: //		If a thread in the third running queue was running, do round-robin
             removeNode(scheduler->round_robin_queue_T3, ptr);
             age();
             thread_handle(ptr);
             break;
-            //		If none of the above, then something went wrong.
-        default:
-            // unlock
+
+        default: //	If none of the above, unlock
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
             return ;
     }
     //	Depending on which queue has the highest first priority, switch the context to run that thread
 
+    // choose the first node from the non-empty highest level running queue
     switch (get_highest_priority()) {
-        //		If there are no more threads, then do nothing.
+        //	no thread, unlock
         case 0:
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
             break;
-            //		If the first queue has the highest priority thread, switch to that one.
-        case 1:
+        case 1: //	If the first queue is not empty, switch to first thread node
             scheduler->current_queue_number = 1;
             getitimer(ITIMER_VIRTUAL, &timer);
             timer.it_value.tv_usec = TIMER_PARA;
@@ -631,7 +629,7 @@ static void sched_MLFQ() {
             swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T1->head->next->tcb->context);
             break;
             //		If the second queue has the highest priority thread, switch to that one.
-        case 2:
+        case 2: //	If second queue is not empty, switch to first thread node
             scheduler->current_queue_number = 2;
             getitimer(ITIMER_VIRTUAL, &timer);
             timer.it_value.tv_usec = TIMER_PARA2;
@@ -660,8 +658,7 @@ static void sched_MLFQ() {
 //            swapcontext(get_current_thread()->tcb->context, scheduler->round_robin_queue_T2->head->next->tcb->context);
             swapcontext(ptr->tcb->context, scheduler->round_robin_queue_T2->head->next->tcb->context);
             break;
-            //		If the third queue has the highest priority thread, switch to that one.
-        case 3:
+        case 3: //	If the third queue is not empty, switch to first thread node
             scheduler->current_queue_number = 3;
             getitimer(ITIMER_VIRTUAL, &timer);
             timer.it_value.tv_usec = 0;
@@ -693,7 +690,7 @@ static void sched_MLFQ() {
             }
             break;
         default:
-            //		If none of the above, then something went wrong.
+            //	unlock
             __sync_lock_release(&scheduler_running);
             __sync_lock_release(&modifying_queue);
             return ;
@@ -757,10 +754,10 @@ int age() {
         ptr->tcb->priority += 1;
         ptr = ptr->next;
     }
-    // printf("Aging done\n");
     return 0;
 }
 
+// MLFQ handle
 int thread_handle(Node *ptr) {
     switch (ptr->tcb->yield_purpose) {
         case 1: {
@@ -898,14 +895,14 @@ int get_highest_priority() {
         highest_priority = scheduler->round_robin_queue_T1->head->next->tcb->priority;
         highest_priority_queue = 1;
     }
-    //	Compare the priority of the first element in the second queue
+    //	same logic as first queue
     if (scheduler->round_robin_queue_T2->size != 0) {
         if (scheduler->round_robin_queue_T2->head->next->tcb->priority > highest_priority) {
             highest_priority = scheduler->round_robin_queue_T2->head->next->tcb->priority;
             highest_priority_queue = 2;
         }
     }
-    //	Compare the priority of the first element in the third queue
+    //	same logic as first queue
     if (scheduler->round_robin_queue_T3->size != 0) {
         if (scheduler->round_robin_queue_T3->head->next->tcb->priority > highest_priority) {
             highest_priority = scheduler->round_robin_queue_T3->head->next->tcb->priority;

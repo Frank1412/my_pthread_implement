@@ -1083,7 +1083,7 @@ void removeNode(Queue *queue, Node *node){
     queue->size--;
 }
 
-void insertBefore(Queue* queue, Node *node, Node *pivot){
+void insertBefore(Queue* queue, Node * node, Node *pivot){
     Node *prev = pivot->prev;
     node->prev = prev;
     node->next = pivot;
