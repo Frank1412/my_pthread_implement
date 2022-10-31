@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
-#include "../mypthread.h"
+#include "../mypthread_old.h"
 
 /* A scratch program template on which to call and
  * test mypthread library functions as you implement

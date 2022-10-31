@@ -12,13 +12,14 @@
 // global variables
 Scheduler *scheduler;
 struct itimerval timer;
-int scheduler_running; // binary semaphore
+int scheduler_running; // binary semaphoreS
 int modifying_queue; // binary semaphore
 ucontext_t *return_function;
 mypthread_t thread_number;
 uint mutex_id;
-int TIMER_PARA=2500;
-int QUEUE_NUMBER=1;
+int TIMER_PARA=250000;
+int QUEUE_NUMBER=3;
+int TIMER_PARA2=500000;
 
 
 
@@ -604,8 +605,8 @@ static void sched_MLFQ() {
         case 1:
             scheduler->current_queue_number = 1;
             getitimer(ITIMER_VIRTUAL, &timer);
-            timer.it_value.tv_usec = 2500;
-            timer.it_interval.tv_usec = 250;
+            timer.it_value.tv_usec = TIMER_PARA;
+            timer.it_interval.tv_usec = TIMER_PARA;
             setitimer(ITIMER_VIRTUAL, &timer, NULL);
             if (ptr->tcb->tid == scheduler->round_robin_queue_T1->head->next->tcb->tid) { // this is the only thread
                 __sync_lock_release(&scheduler_running);
@@ -634,8 +635,8 @@ static void sched_MLFQ() {
         case 2:
             scheduler->current_queue_number = 2;
             getitimer(ITIMER_VIRTUAL, &timer);
-            timer.it_value.tv_usec = 5000;
-            timer.it_interval.tv_usec = 5000;
+            timer.it_value.tv_usec = TIMER_PARA2;
+            timer.it_interval.tv_usec = TIMER_PARA2;
             setitimer(ITIMER_VIRTUAL, &timer, NULL);
             if (ptr->tcb->tid == scheduler->round_robin_queue_T2->head->next->tcb->tid) { // this is the only thread
                 __sync_lock_release(&scheduler_running);
