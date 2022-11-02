@@ -3,4 +3,5 @@ project(myPthread C)
 
 set(CMAKE_C_STANDARD 99)
 
-add_executable(myPthread main.c test.c)
+#add_executable(myPthread main.c test.c)
+add_executable(mypthread main.c mypthread.c)
