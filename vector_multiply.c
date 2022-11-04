@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <pthread.h>
 //#include "../mypthread.h"
-#include "test.h"
+//#include "test.h"
 
 #define DEFAULT_THREAD_NUM 2
 #define VECTOR_SIZE 3000000
@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
 //			thread_num = atoi(argv[1]);
 //		}
 //	}
-    thread_num=2;
+    thread_num=6;
 
 	// initialize counter
 	counter = (int*)malloc(thread_num*sizeof(int));

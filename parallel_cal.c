@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
-#include "../mypthread.h"
+//#include "../mypthread.h"
+//#include "../test.h"
+#include "test.h"
 #include "string.h"
 
 #define DEFAULT_THREAD_NUM 4
@@ -60,15 +62,16 @@ int main(int argc, char **argv) {
 	
 	int i = 0, j = 0;
 
-	if (argc == 1) {
-		thread_num = DEFAULT_THREAD_NUM;
-	} else {
-		if (argv[1] < 1) {
-			printf("enter a valid thread number\n");
-			return 0;
-		} else
-			thread_num = atoi(argv[1]);
-	}
+//	if (argc == 1) {
+//		thread_num = DEFAULT_THREAD_NUM;
+//	} else {
+//		if (argv[1] < 1) {
+//			printf("enter a valid thread number\n");
+//			return 0;
+//		} else
+//			thread_num = atoi(argv[1]);
+//	}
+    thread_num=6;
 
 	// initialize counter
 	counter = (int*)malloc(thread_num*sizeof(int));
